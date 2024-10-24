@@ -4,10 +4,41 @@ import fs from 'fs'
 
 const fastify = Fastify({logger: true})
 
-fastify.post('/play', async (request, reply) => {
-    const game = request.body
+const opts = {
+    schema: {
+        body: {
+            type: 'object',
+            properties: {
+                browser: { type: 'string' },
+                session: {
+                    type: 'object',
+                    properties: {
+                        id: { type: 'string' }
+                    }
+                },
+                steps: {
+                    type: 'array'
+                },
+                output: {
+                    type: 'object',
+                    properties: {
+                        type: { type: 'string' },
+                        content: {
+                            oneOf: [
+                                { type: 'string' },
+                                { type: 'object' }
+                            ]
+                        },
+                        binaryEncoding: { type: 'string' }
+                    }
+                }
+            }
+        }
+    }
+}
 
-console.log(JSON.stringify(game))
+fastify.post('/play', opts, async (request, reply) => {
+    const game = request.body
 
     const launchArgs = JSON.stringify({
       headless: false,
@@ -86,23 +117,40 @@ console.log(JSON.stringify(game))
                     }
                 }
                 if (step.element.locateBy === 'role') {
-                    await page.getByRole(step.element.role, { name: step.element.name }).click()
+                    await page.getByRole(step.element.role, { name: step.element.name, exact: true }).click()
                 } else {
                     await page.locator(step.element.locator).click()
                 }
                 await page.waitForTimeout(500);
                 break
             case 'fill':
+                let value = step.value
+
+                Object.keys(data).forEach(key => {
+                    value = value.replace('${'+key+'}', data[key])
+                })
+
                 if (step.element.locateBy === 'role') {
-                    await page.getByRole(step.element.role, { name: step.element.name }).fill(step.value)
+                    await page.getByRole(step.element.role, { name: step.element.name }).fill(value)
                 } else {
-                    console.log(step.element, step.value)
-                    await page.locator(step.element.locator).fill(step.value)
+                    console.log(step.element, value)
+                    await page.locator(step.element.locator).fill(value)
                 }
                 if (step.enter) {
                     await page.keyboard.press('Enter')
                 }
-                await page.waitForTimeout(500);
+                await page.waitForTimeout(2000);
+                break
+            case 'extractText':
+                let text
+                if (step.element.locateBy === 'role') {
+                    text = await page.getByRole(step.element.role, { name: step.element.name }).textContent()
+                } else {
+                    text = await page.locator(step.element.locator).textContent()
+                }
+                if (step.output) {
+                    data[step.output] = text
+                }
                 break
         }
     }
@@ -115,48 +163,20 @@ console.log(JSON.stringify(game))
     await browser.close()
 
     if (game.output) {
-        reply.type(game.output.type || 'application/json').send(data[game.output.content])
+        const type = game.output.type || 'application/json'
+
+        if (type === 'application/json' && game.output.content instanceof Object) {
+            const out = Object.keys(game.output.content).reduce((out, targetKey) => {
+                return {...out, [targetKey]: data[game.output.content[targetKey]]}
+            }, {})
+            return out
+        }
+
+        if (type === 'application.json' && game.output.binaryEncoding) {
+            data[game.output.content] = data[game.output.content].toString(game.output.binaryEncoding)
+        }
+        reply.type(type).send(type === 'application/json' ? JSON.stringify(data[game.output.content]) : data[game.output.content] )
     }
 })
 
 await fastify.listen({ port: 3000 })
-
-
-/*
-{
-    browser: 'firefox',
-    session: {
-        id: 'abc',
-        ttl: 3600
-    },
-    steps: [
-        {
-            action: 'goto',
-            url: 'https://www.google.fr',
-            referer: 'toto'
-        },
-        {
-            action: 'evaluate',
-            script: 'bla()',
-            output: 'mavar'
-        },
-        {
-            action: 'fill',
-            field: '#input',
-            value: '${mavar}'
-        },
-        {
-            action: 'screenshot',
-            output: 'page'
-        }
-    ],
-    output: {
-        type: 'application/json',
-        content: 'page'
-    }
-}
-*/
-
-
-
-
