@@ -119,7 +119,8 @@ class GameEngineV1 {
                         }
                         break
                     case 'screenshot':
-                        const resultS = await page.screenshot({ fullPage: true })
+                        const type = game.output?.type === 'image/jpeg' ? 'jpeg' : 'png'
+                        const resultS = await page.screenshot({ fullPage: step.fullPage ?? true, type })
                         if (step.output) {
                             data[step.output] = resultS
                         }
@@ -259,7 +260,28 @@ fastify.post('/v1/play', optsV1, async (request, reply) => {
 })
 
 fastify.get('/v1/tracings/:id', async (request, reply) => {
-    reply.type('application/json').send(tracings[request.params.id])
+    if (!tracings[request.params.id]) {
+        return reply.status(404).send()
+    }
+    reply.type('application/json').send(tracings[request.params.id].map(t => {
+        if (t instanceof Buffer) {
+            return '(binary)'
+        }
+        return t
+    }))
+})
+
+fastify.get('/v1/tracings/:id/:trace', async (request, reply) => {
+    if (!tracings[request.params.id] || !tracings[request.params.id][request.params.trace]) {
+        return reply.status(404).send()
+    }
+
+    if (tracings[request.params.id][request.params.trace] instanceof Buffer) {
+        reply.type('image/png').send(tracings[request.params.id][request.params.trace])
+        return
+    }
+
+    reply.send(tracings[request.params.id][request.params.trace])
 })
 
 await fastify.listen({ port: 3000 })
