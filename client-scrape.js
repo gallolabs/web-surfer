@@ -1,4 +1,4 @@
-const response = await fetch('http://localhost:3000/play', {
+const response = await fetch('http://localhost:3000/v1/play', {
 	method: 'POST',
 	headers: {
       "Content-Type": "application/json",
