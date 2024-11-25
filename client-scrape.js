@@ -66,5 +66,6 @@ const response = await fetch('http://localhost:3000/v1/play', {
 		}
 	})
 })
-
+console.log(response.status)
+console.log(response.headers)
 console.log(await response.json())
