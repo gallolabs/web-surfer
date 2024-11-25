@@ -1,6 +1,6 @@
 import { firefox, devices } from 'playwright'
 import Fastify from 'fastify'
-import fs from 'fs'
+import fs, { readFileSync } from 'fs'
 import { once } from 'events'
 
 import swagger from '@fastify/swagger'
@@ -253,6 +253,7 @@ await fastify.register(async function (fastify) {
     })
 
     await fastify.register(swaggerUi, {
+
         prefix: '/doc',
       uiConfig: {
         docExpansion: 'full',
@@ -264,8 +265,28 @@ await fastify.register(async function (fastify) {
       },
       staticCSP: true,
       transformStaticCSP: (header) => header,
-      transformSpecification: (swaggerObject, request, reply) => { return swaggerObject },
-      transformSpecificationClone: true
+      transformSpecification: (swaggerObject, request, reply) => {
+        swaggerObject.servers[0].url = 'http://' + request.hostname + ':' + request.port
+        return swaggerObject
+    },
+      transformSpecificationClone: true,
+      theme: {
+        title: 'Botbot v1',
+favicon: [
+      {
+        filename: 'favicon.png',
+        rel: 'icon',
+        sizes: '32x32',
+        type: 'image/png',
+        content: readFileSync('./favicon-32x32.png')
+      }
+    ]
+      },
+    logo: {
+        type: 'image/png',
+        content: readFileSync('./logo_w200.jpeg')
+      },
+
     })
 
     fastify.post('/play', optsV1, async (request, reply) => {
