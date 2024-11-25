@@ -10,6 +10,8 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@fastify/swagger": "^9.4.0",
+    "@fastify/swagger-ui": "^5.1.0",
     "@ulixee/cli": "^2.0.0-alpha.30",
     "@ulixee/cloud": "^2.0.0-alpha.30",
     "@ulixee/hero-playground": "^2.0.0-alpha.30",

@@ -3,6 +3,10 @@ import Fastify from 'fastify'
 import fs from 'fs'
 import { once } from 'events'
 
+import swagger from '@fastify/swagger'
+
+import swaggerUi from '@fastify/swagger-ui'
+
 const fastify = Fastify({logger: true})
 
 const optsV1 = {
@@ -18,7 +22,10 @@ const optsV1 = {
                     }
                 },
                 steps: {
-                    type: 'array'
+                    type: 'array',
+                    items: {
+                        type: 'object'
+                    }
                 },
                 output: {
                     type: 'object',
@@ -227,61 +234,104 @@ class GameEngineV1 {
     }
 }
 
+
+
+
+await fastify.register(async function (fastify) {
+    await fastify.register(swagger
+      , {
+      openapi: {
+        info: {
+          title: 'Bobot',
+          description: 'Scraping tool through API',
+          version: '0.1.0'
+        },
+        servers:[
+          {url: 'http://127.0.0.1:3000'},
+        ]
+      }
+    })
+
+    await fastify.register(swaggerUi, {
+        prefix: '/doc',
+      uiConfig: {
+        docExpansion: 'full',
+        deepLinking: false
+      },
+      uiHooks: {
+        onRequest: function (request, reply, next) { next() },
+        preHandler: function (request, reply, next) { next() }
+      },
+      staticCSP: true,
+      transformStaticCSP: (header) => header,
+      transformSpecification: (swaggerObject, request, reply) => { return swaggerObject },
+      transformSpecificationClone: true
+    })
+
+    fastify.post('/play', optsV1, async (request, reply) => {
+        const game = request.body
+
+        const tracingId = Math.random().toString(36)
+        reply.header('X-Tracing-Id', tracingId)
+
+        try {
+            const result = await (new GameEngineV1).play(game, tracingId)
+
+            if (result) {
+                reply
+                    .type(result.type)
+                    .send(result.type === 'application/json'
+                        ? JSON.stringify(result.content)
+                        : result.content
+                    )
+            }
+
+        } catch (e) {
+
+            reply.status(500).type('application/json').send(JSON.stringify({
+                error: 'Failed play',
+                tracing: tracings[tracingId]
+            }))
+        } finally {
+            setTimeout(() => {delete tracings[tracingId]}, 1000 * 60 * 5)
+        }
+
+    })
+
+    fastify.get('/tracings/:id', async (request, reply) => {
+        if (!tracings[request.params.id]) {
+            return reply.status(404).send()
+        }
+        reply.type('application/json').send(tracings[request.params.id].map(t => {
+            if (t instanceof Buffer) {
+                return '(binary)'
+            }
+            return t
+        }))
+    })
+
+    fastify.get('/tracings/:id/:trace', async (request, reply) => {
+        if (!tracings[request.params.id] || !tracings[request.params.id][request.params.trace]) {
+            return reply.status(404).send()
+        }
+
+        if (tracings[request.params.id][request.params.trace] instanceof Buffer) {
+            reply.type('image/png').send(tracings[request.params.id][request.params.trace])
+            return
+        }
+
+        reply.send(tracings[request.params.id][request.params.trace])
+    })
+
+
+
+}, {prefix: '/v1'})
+
+
+
 const tracings = {}
 
-fastify.post('/v1/play', optsV1, async (request, reply) => {
-    const game = request.body
 
-    const tracingId = Math.random().toString(36)
-    reply.header('X-Tracing-Id', tracingId)
 
-    try {
-        const result = await (new GameEngineV1).play(game, tracingId)
-
-        if (result) {
-            reply
-                .type(result.type)
-                .send(result.type === 'application/json'
-                    ? JSON.stringify(result.content)
-                    : result.content
-                )
-        }
-
-    } catch (e) {
-
-        reply.status(500).type('application/json').send(JSON.stringify({
-            error: 'Failed play',
-            tracing: tracings[tracingId]
-        }))
-    } finally {
-        setTimeout(() => {delete tracings[tracingId]}, 1000 * 60 * 5)
-    }
-
-})
-
-fastify.get('/v1/tracings/:id', async (request, reply) => {
-    if (!tracings[request.params.id]) {
-        return reply.status(404).send()
-    }
-    reply.type('application/json').send(tracings[request.params.id].map(t => {
-        if (t instanceof Buffer) {
-            return '(binary)'
-        }
-        return t
-    }))
-})
-
-fastify.get('/v1/tracings/:id/:trace', async (request, reply) => {
-    if (!tracings[request.params.id] || !tracings[request.params.id][request.params.trace]) {
-        return reply.status(404).send()
-    }
-
-    if (tracings[request.params.id][request.params.trace] instanceof Buffer) {
-        reply.type('image/png').send(tracings[request.params.id][request.params.trace])
-        return
-    }
-
-    reply.send(tracings[request.params.id][request.params.trace])
-})
 
 await fastify.listen({ port: 3000 })
