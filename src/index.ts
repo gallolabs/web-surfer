@@ -1,7 +1,10 @@
-import { firefox, devices } from 'playwright'
+// @ts-nocheck
+import { firefox/*, devices */} from 'playwright'
 import Fastify from 'fastify'
 import fs, { readFileSync } from 'fs'
 import { once } from 'events'
+
+import { FromSchema } from "json-schema-to-ts"
 
 import swagger from '@fastify/swagger'
 
@@ -9,23 +12,74 @@ import swaggerUi from '@fastify/swagger-ui'
 
 const fastify = Fastify({logger: true})
 
-const optsV1 = {
-    schema: {
-        body: {
+class GameEngineV1 {
+    actions = {
+        goto: {
+            paramsSchema: {
+                properties: {
+                    referer: { type: 'string' },
+                    url: { type: 'string' }
+                },
+                required: ['url']
+            },
+            async handler({context, step}) {
+                const page = await context.newPage({
+                    extraHTTPHeaders: {
+                        Referer: step.referer
+                    }
+                })
+                const [[r]] = await Promise.all([
+                    once(page, 'response'),
+                    page.goto(step.url)
+                ])
+
+                if (r.status() !== 200) {
+                    throw new Error('Invalid status ' + r.status())
+                }
+
+                await page.waitForTimeout(1000);
+
+                await page.mouse.move(500, 600, { steps: 10 });
+
+                await page.evaluate(() => {
+                    window.scrollBy(0, window.innerHeight / 2);  // Scroller la page
+                });
+
+                return {page}
+            }
+        }
+    }
+
+    getSchema() {
+        const actions = this.actions
+
+        return {
+            required: ['steps'],
             type: 'object',
             properties: {
-                browser: { type: 'string' },
+                browser: { enum: ['firefox', 'chrome'] },
                 session: {
                     type: 'object',
                     properties: {
-                        id: { type: 'string' }
-                    }
+                        id: { type: 'string' },
+                        ttl: { type: 'integer'}
+                    },
+                    required: ['id']
                 },
                 steps: {
                     type: 'array',
-                    items: {
-                        type: 'object'
-                    }
+                    minItems: 1,
+                    // items: {
+                    //     oneOf: Object.keys(actions).map(actionName => ({
+                    //         type: 'object',
+                    //         ...actions[actionName].paramsSchema,
+                    //         required: ['type'].concat(actions[actionName].paramsSchema.required || []),
+                    //         properties: {
+                    //             type: {enum: [actionName]},
+                    //             ...actions[actionName].paramsSchema.properties
+                    //         }
+                    //     }))
+                    // }
                 },
                 output: {
                     type: 'object',
@@ -43,12 +97,10 @@ const optsV1 = {
             }
         }
     }
-}
 
-class GameEngineV1 {
     async play(game, tracingId) {
 
-        const tracing = []
+        const tracing: any[] = []
         tracings[tracingId] = tracing
         let browser
         let page;
@@ -79,7 +131,7 @@ class GameEngineV1 {
             });
 
             if (cookiesPath && fs.existsSync(cookiesPath)) {
-                const cookies = JSON.parse(fs.readFileSync(cookiesPath));
+                const cookies = JSON.parse(fs.readFileSync(cookiesPath, {encoding: 'utf8'}));
                 await context.addCookies(cookies);
                 tracing.push('Reusing cookies for ' + game.session?.id)
             } else if (cookiesPath) {
@@ -90,34 +142,14 @@ class GameEngineV1 {
                 Object.defineProperty(navigator, 'webdriver', {get: () => undefined})
             })
 
-            const data = {}
+            const data: any = {}
 
             for(const step of game.steps) {
                 tracing.push('Step ' + step.action)
                 switch(step.action) {
                     case 'goto':
-                        page = await context.newPage({
-                            extraHTTPHeaders: {
-                                Referer: step.referer
-                            }
-                        })
-                        const [[r]] = await Promise.all([
-                            once(page, 'response'),
-                            page.goto(step.url)
-                        ])
-
-                        if (r.status() !== 200) {
-                            throw new Error('Invalid status ' + r.status())
-                        }
-
-                        await page.waitForTimeout(1000);
-
-                        await page.mouse.move(500, 600, { steps: 10 });
-
-                        await page.evaluate(() => {
-                            window.scrollBy(0, window.innerHeight / 2);  // Scroller la page
-                        });
-
+                        const s = await this.actions.goto.handler({context, step})
+                        page = s.page
                         break
                     case 'evaluate':
                         const result = await page.evaluate(step.script)
@@ -235,7 +267,11 @@ class GameEngineV1 {
 }
 
 
-
+const optsV1 = {
+    schema: {
+        body: (new GameEngineV1).getSchema()
+    }
+}
 
 await fastify.register(async function (fastify) {
     await fastify.register(swagger
@@ -254,18 +290,18 @@ await fastify.register(async function (fastify) {
 
     await fastify.register(swaggerUi, {
 
-        prefix: '/doc',
+      routePrefix: '/doc',
       uiConfig: {
         docExpansion: 'full',
         deepLinking: false
       },
-      uiHooks: {
-        onRequest: function (request, reply, next) { next() },
-        preHandler: function (request, reply, next) { next() }
-      },
+      // uiHooks: {
+      //   onRequest: function (request, reply, next) { next() },
+      //   preHandler: function (request, reply, next) { next() }
+      // },
       staticCSP: true,
       transformStaticCSP: (header) => header,
-      transformSpecification: (swaggerObject, request, reply) => {
+      transformSpecification: (swaggerObject, request) => {
         swaggerObject.servers[0].url = 'http://' + request.hostname + ':' + request.port
         return swaggerObject
     },
@@ -285,7 +321,7 @@ favicon: [
     logo: {
         type: 'image/png',
         content: readFileSync('./logo_w200.jpeg')
-      },
+      }
 
     })
 
@@ -319,7 +355,10 @@ favicon: [
 
     })
 
-    fastify.get('/tracings/:id', async (request, reply) => {
+    const getTracingParamsSchema = { type: 'object', properties: {id: {type: 'string'}}, required: ['id'] } as const
+
+    fastify.get<{Params: FromSchema<typeof getTracingParamsSchema>}>('/tracings/:id', { schema: {params: getTracingParamsSchema} }, async (request, reply) => {
+
         if (!tracings[request.params.id]) {
             return reply.status(404).send()
         }
@@ -329,9 +368,11 @@ favicon: [
             }
             return t
         }))
-    })
+    });
 
-    fastify.get('/tracings/:id/:trace', async (request, reply) => {
+    const getTracingTraceParamsSchema = { type: 'object', properties: {id: {type: 'string'}, trace: {type: 'number'}}, required: ['id', 'trace'] } as const
+
+    fastify.get<{Params: FromSchema<typeof getTracingTraceParamsSchema>}>('/tracings/:id/:trace', async (request, reply) => {
         if (!tracings[request.params.id] || !tracings[request.params.id][request.params.trace]) {
             return reply.status(404).send()
         }
@@ -350,7 +391,7 @@ favicon: [
 
 
 
-const tracings = {}
+const tracings: Record<string, any[]> = {}
 
 
 
