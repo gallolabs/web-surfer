@@ -45,7 +45,7 @@ const response = await fetch('http://localhost:3000/v1/play', {
 					locateBy: 'locator',
 					locator: '.search-field'
 				},
-				value: '${ipv4}',
+				value: '{{ipv4}}',
 				enter: true
 			},
 			{

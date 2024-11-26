@@ -12,6 +12,8 @@ import swaggerUi from '@fastify/swagger-ui'
 
 const fastify = Fastify({logger: true})
 
+import jsonata from 'jsonata'
+
 class GameEngineV1 {
     actions = {
         goto: {
@@ -22,18 +24,30 @@ class GameEngineV1 {
                 },
                 required: ['url']
             },
-            async handler({context, step}) {
-                const page = await context.newPage({
+            async handler({context, step, page, data}) {
+
+                if (page) {
+                    await page.close()
+                }
+                page = await context.newPage({
                     extraHTTPHeaders: {
                         Referer: step.referer
                     }
                 })
+                let url = step.url
+
+                Object.keys(data).forEach(key => {
+                    // uri template
+                    url = url.replace('{{'+key+'}}', encodeURIComponent(data[key]))
+                })
+
+
                 const [[r]] = await Promise.all([
                     once(page, 'response'),
-                    page.goto(step.url)
+                    page.goto(url)
                 ])
 
-                if (r.status() !== 200) {
+                if (r.status() >= 400) {
                     throw new Error('Invalid status ' + r.status())
                 }
 
@@ -65,6 +79,9 @@ class GameEngineV1 {
                         ttl: { type: 'integer'}
                     },
                     required: ['id']
+                },
+                data: {
+                    type: 'object'
                 },
                 steps: {
                     type: 'array',
@@ -127,8 +144,10 @@ class GameEngineV1 {
                 viewport: { width: 1920, height: 945 },
                 screen: { width: 1920, height: 1080 },
                 locale: 'fr_FR',
-                timezoneId: 'Europe/Paris',
+                timezoneId: 'Europe/Paris'
             });
+
+            context.setDefaultTimeout(5000)
 
             if (cookiesPath && fs.existsSync(cookiesPath)) {
                 const cookies = JSON.parse(fs.readFileSync(cookiesPath, {encoding: 'utf8'}));
@@ -142,13 +161,13 @@ class GameEngineV1 {
                 Object.defineProperty(navigator, 'webdriver', {get: () => undefined})
             })
 
-            const data: any = {}
+            const data: any = game.data || {}
 
             for(const step of game.steps) {
                 tracing.push('Step ' + step.action)
                 switch(step.action) {
                     case 'goto':
-                        const s = await this.actions.goto.handler({context, step})
+                        const s = await this.actions.goto.handler({context, step, data})
                         page = s.page
                         break
                     case 'evaluate':
@@ -184,10 +203,22 @@ class GameEngineV1 {
                         await page.waitForTimeout(500);
                         break
                     case 'fill':
+                        if (step.skipMissingElement) {
+                            if (step.element.locateBy === 'role') {
+                                if (await page.getByRole(step.element.role, { name: step.element.name }).count() === 0) {
+                                    break
+                                }
+                            } else {
+                                if (await page.locator(step.element.locator).count() === 0) {
+                                    break
+                                }
+                            }
+                        }
+
                         let value = step.value
 
                         Object.keys(data).forEach(key => {
-                            value = value.replace('${'+key+'}', data[key])
+                            value = value.replace('{{'+key+'}}', data[key])
                         })
 
                         if (step.element.locateBy === 'role') {
@@ -199,7 +230,7 @@ class GameEngineV1 {
                         if (step.enter) {
                             await page.keyboard.press('Enter')
                         }
-                        await page.waitForTimeout(2000);
+                        await page.waitForTimeout(step.wait || 2000);
                         break
                     case 'extractText':
                         let text
@@ -208,10 +239,15 @@ class GameEngineV1 {
                         } else {
                             text = await page.locator(step.element.locator).textContent()
                         }
+                        if (step.transform) {
+                            text = await jsonata(step.transform).evaluate(text)
+                        }
                         if (step.output) {
                             data[step.output] = text
                         }
                         break
+                    case 'extractContent':
+                        data[step.output] = await page.content()
                 }
             }
 
@@ -251,7 +287,7 @@ class GameEngineV1 {
                 try {
                     tracing.push(await page.screenshot())
                 } catch(e) {
-                    tracing.push('Unaible to screenshot ' + e.message)
+                    tracing.push('Unable to screenshot : ' + e.message)
                 }
             }
             throw e
@@ -330,6 +366,7 @@ favicon: [
 
         const tracingId = Math.random().toString(36)
         reply.header('X-Tracing-Id', tracingId)
+        reply.header('X-Tracing-Url', 'http://' + request.hostname + ':' + request.port + '/v1/tracings/' + tracingId)
 
         try {
             const result = await (new GameEngineV1).play(game, tracingId)
@@ -362,20 +399,33 @@ favicon: [
         if (!tracings[request.params.id]) {
             return reply.status(404).send()
         }
-        reply.type('application/json').send(tracings[request.params.id].map(t => {
-            if (t instanceof Buffer) {
-                return '(binary)'
+        reply.type('application/json').send(tracings[request.params.id].map((t, i) => {
+            return {
+                id: i,
+                url: 'http://' + request.hostname + ':' + request.port + '/v1/tracings/' + request.params.id + '/' + i,
+                value: t instanceof Buffer ? '(binary)' : t
             }
-            return t
         }))
     });
 
-    const getTracingTraceParamsSchema = { type: 'object', properties: {id: {type: 'string'}, trace: {type: 'number'}}, required: ['id', 'trace'] } as const
+    const getTracingTraceParamsSchema = { type: 'object', properties: {id: {type: 'string'}, trace: {type: ['number', 'string']}}, required: ['id', 'trace'] } as const
 
     fastify.get<{Params: FromSchema<typeof getTracingTraceParamsSchema>}>('/tracings/:id/:trace', async (request, reply) => {
-        if (!tracings[request.params.id] || !tracings[request.params.id][request.params.trace]) {
+
+        if (!tracings[request.params.id]) {
             return reply.status(404).send()
         }
+
+        if (request.params.trace === 'last') {
+            request.params.trace = tracings[request.params.id].length - 1
+        } else {
+            request.params.trace = parseInt(request.params.trace, 10)
+        }
+
+        if (!tracings[request.params.id][request.params.trace]) {
+            return reply.status(404).send()
+        }
+
 
         if (tracings[request.params.id][request.params.trace] instanceof Buffer) {
             reply.type('image/png').send(tracings[request.params.id][request.params.trace])
