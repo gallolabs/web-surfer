@@ -26,27 +26,32 @@ const response = await fetch('http://localhost:3000/v1/play', {
 		steps: [
 			{
 				action: 'goto',
-				url: 'https://monespace.grdf.fr/'
+				url: 'https://monespace.grdf.fr/',
+				output: 'url'
 			},
 			{
-				action: 'fill',
-				skipMissingElement: true,
-				element: {
-					locateBy: 'locator',
-					locator: '[name="identifier"]'
-				},
-				value: '{{email}}',
-				enter: true
-			},
-			{
-				action: 'fill',
-				skipMissingElement: true,
-				element: {
-					locateBy: 'locator',
-					locator: '[name="credentials.passcode"]'
-				},
-				value: '{{password}}',
-				enter: true
+				action: 'if',
+				condition: '$contains(url, "connexion.grdf.fr")',
+				steps: [
+					{
+						action: 'fill',
+						element: {
+							locateBy: 'locator',
+							locator: '[name="identifier"]'
+						},
+						value: '{{email}}',
+						enter: true
+					},
+					{
+						action: 'fill',
+						element: {
+							locateBy: 'locator',
+							locator: '[name="credentials.passcode"]'
+						},
+						value: '{{password}}',
+						enter: true
+					}
+				]
 			},
 			{
 				action: 'goto',

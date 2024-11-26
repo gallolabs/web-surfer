@@ -59,6 +59,10 @@ class GameEngineV1 {
                     window.scrollBy(0, window.innerHeight / 2);  // Scroller la page
                 });
 
+                if (step.output) {
+                    data[step.output] = await page.url()
+                }
+
                 return {page}
             }
         }
@@ -163,9 +167,16 @@ class GameEngineV1 {
 
             const data: any = game.data || {}
 
-            for(const step of game.steps) {
+            const playStep = async(step) => {
                 tracing.push('Step ' + step.action)
                 switch(step.action) {
+                    case 'if':
+                        if (await jsonata(step.condition).evaluate(data)) {
+                            for(const step2 of step.steps) {
+                                await playStep(step2)
+                            }
+                        }
+                        break
                     case 'goto':
                         const s = await this.actions.goto.handler({context, step, data})
                         page = s.page
@@ -249,6 +260,10 @@ class GameEngineV1 {
                     case 'extractContent':
                         data[step.output] = await page.content()
                 }
+            }
+
+            for(const step of game.steps) {
+                await playStep(step)
             }
 
             if (cookiesPath) {
