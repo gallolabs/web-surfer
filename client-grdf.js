@@ -55,7 +55,7 @@ const response = await fetch('http://localhost:3000/v1/play', {
 			},
 			{
 				action: 'goto',
-				url: 'https://monespace.grdf.fr/api/e-conso/pce/consommation/informatives?dateDebut={{start}}&dateFin={{end}}&pceList%5B%5D={{compteur}}'
+				url: 'https://monespace.grdf.fr/api/e-conso/pce/consommation/informatives?dateDebut={start}&dateFin={end}&pceList%5B%5D={compteur}'
 			},
 			{
 				action: 'extractText',

@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { firefox/*, devices */} from 'playwright'
+import { firefox, webkit, chromium/*, devices */} from 'playwright'
 import Fastify from 'fastify'
 import fs, { readFileSync } from 'fs'
 import { once } from 'events'
@@ -38,7 +38,7 @@ class GameEngineV1 {
 
                 Object.keys(data).forEach(key => {
                     // uri template
-                    url = url.replace('{{'+key+'}}', encodeURIComponent(data[key]))
+                    url = url.replace('{'+key+'}', encodeURIComponent(data[key]))
                 })
 
 
@@ -75,7 +75,7 @@ class GameEngineV1 {
             required: ['steps'],
             type: 'object',
             properties: {
-                browser: { enum: ['firefox', 'chrome'] },
+                browser: { enum: ['firefox', 'chrome', 'webkit', 'chromium'] },
                 session: {
                     type: 'object',
                     properties: {
@@ -139,7 +139,22 @@ class GameEngineV1 {
 
             const cookiesPath = game.session?.id ? game.session?.id + '.json' : null;
 
-            browser = await firefox.connect('ws://lapdell:3000/'+(game.browser || 'firefox')+'/playwright?token=6R0W53R135510&launch=' + launchArgs)
+            const browserName = game.browser || 'firefox'
+            const playwrightLib = (() => {
+                switch (browserName) {
+                    case 'chrome':
+                    case 'chromium':
+                        return chromium
+                    case 'firefox':
+                        return firefox
+                    case 'webkit':
+                        return webkit
+                    default:
+                        throw new Error('Invalid browser ' + browserName)
+                }
+            })()
+
+            browser = await playwrightLib.connect('ws://lapdell:3000/'+browserName+'/playwright?token=6R0W53R135510&launch=' + launchArgs)
 
             tracing.push('Connected to ' + game.browser)
 
