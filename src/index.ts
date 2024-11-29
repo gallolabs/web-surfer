@@ -84,7 +84,7 @@ class GameEngineV1 {
                     },
                     required: ['id']
                 },
-                data: {
+                variables: {
                     type: 'object'
                 },
                 steps: {
@@ -180,7 +180,7 @@ class GameEngineV1 {
                 Object.defineProperty(navigator, 'webdriver', {get: () => undefined})
             })
 
-            const data: any = game.data || {}
+            let data: any = game.variables || {}
 
             const playStep = async(step) => {
                 tracing.push('Step ' + step.action)
@@ -265,13 +265,19 @@ class GameEngineV1 {
                         } else {
                             text = await page.locator(step.element.locator).textContent()
                         }
-                        if (step.transform) {
-                            text = await jsonata(step.transform).evaluate(text)
-                        }
                         if (step.output) {
                             data[step.output] = text
                         }
                         break
+                    case 'transform':
+                        const input = step.input ? data[step.input] : data
+                        const value3 = await jsonata(step.expression).evaluate(input)
+
+                        if (step.output) {
+                            data[step.output] = value3
+                        } else {
+                            data = value3
+                        }
                     case 'extractContent':
                         data[step.output] = await page.content()
                 }
@@ -304,6 +310,14 @@ class GameEngineV1 {
                     data[game.output.content] = data[game.output.content].toString(game.output.binaryEncoding)
                 }
 
+                if (game.output.expression) {
+                    return {
+                        type,
+                        content: await jsonata(game.output.expression).evaluate(data),
+                        tracing
+                    }
+                }
+
                 return {
                     type,
                     content: data[game.output.content],
@@ -312,7 +326,8 @@ class GameEngineV1 {
 
             }
         } catch (e) {
-            tracings[tracingId].push(e.message)
+            console.error(e)
+            tracings[tracingId].push(e)
             if (browser) {
                 try {
                     tracing.push(await page.screenshot())
@@ -340,55 +355,52 @@ const optsV1 = {
 }
 
 await fastify.register(async function (fastify) {
-    await fastify.register(swagger
-      , {
-      openapi: {
-        info: {
-          title: 'Bobot',
-          description: 'Scraping tool through API',
-          version: '0.1.0'
-        },
-        servers:[
-          {url: 'http://127.0.0.1:3000'},
-        ]
-      }
+    await fastify.register(swagger, {
+        openapi: {
+            info: {
+                title: 'Bobot API',
+                description: 'Scraping tool through API',
+                version: '1.0'
+            },
+            servers:[
+                {url: 'http://127.0.0.1:3000'},
+            ]
+        }
     })
 
     await fastify.register(swaggerUi, {
-
-      routePrefix: '/doc',
-      uiConfig: {
-        docExpansion: 'full',
-        deepLinking: false
-      },
-      // uiHooks: {
-      //   onRequest: function (request, reply, next) { next() },
-      //   preHandler: function (request, reply, next) { next() }
-      // },
-      staticCSP: true,
-      transformStaticCSP: (header) => header,
-      transformSpecification: (swaggerObject, request) => {
-        swaggerObject.servers[0].url = 'http://' + request.hostname + ':' + request.port
-        return swaggerObject
-    },
-      transformSpecificationClone: true,
-      theme: {
-        title: 'Botbot v1',
-favicon: [
-      {
-        filename: 'favicon.png',
-        rel: 'icon',
-        sizes: '32x32',
-        type: 'image/png',
-        content: readFileSync('./favicon-32x32.png')
-      }
-    ]
-      },
-    logo: {
-        type: 'image/png',
-        content: readFileSync('./logo_w200.jpeg')
-      }
-
+        routePrefix: '/doc',
+        uiConfig: {
+            docExpansion: 'full',
+            deepLinking: false
+        },
+        // uiHooks: {
+        //   onRequest: function (request, reply, next) { next() },
+        //   preHandler: function (request, reply, next) { next() }
+        // },
+        staticCSP: true,
+        transformStaticCSP: (header) => header,
+        transformSpecification: (swaggerObject, request) => {
+            swaggerObject.servers[0].url = 'http://' + request.hostname + ':' + request.port
+            return swaggerObject
+        },
+        transformSpecificationClone: true,
+        theme: {
+            title: 'Botbot v1',
+            favicon: [
+                {
+                    filename: 'favicon.png',
+                    rel: 'icon',
+                    sizes: '32x32',
+                    type: 'image/png',
+                    content: readFileSync('./favicon-32x32.png')
+                }
+            ]
+        },
+        logo: {
+            type: 'image/png',
+            content: readFileSync('./logo_w200.jpeg')
+        }
     })
 
     fastify.post('/play', optsV1, async (request, reply) => {
@@ -465,15 +477,8 @@ favicon: [
         reply.send(tracings[request.params.id][request.params.trace])
     })
 
-
-
 }, {prefix: '/v1'})
 
-
-
 const tracings: Record<string, any[]> = {}
-
-
-
 
 await fastify.listen({ port: 3000 })

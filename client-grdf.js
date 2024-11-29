@@ -1,9 +1,9 @@
 const compteur = process.env.COMPTEUR
 const email = process.env.EMAIL
-const password = process.env.PASSWORD
+const _password = process.env.PASSWORD
 
 const start = '2024-11-20'
-const end = '2024-11-26'
+const end = '2024-11-30'
 
 const response = await fetch('http://localhost:3000/v1/play', {
 	method: 'POST',
@@ -16,10 +16,10 @@ const response = await fetch('http://localhost:3000/v1/play', {
 			id: 'abc',
 			ttl: 3600
 		},
-		data: {
+		variables: {
 			compteur,
 			email,
-			password,
+			_password,
 			start,
 			end
 		},
@@ -48,7 +48,7 @@ const response = await fetch('http://localhost:3000/v1/play', {
 							locateBy: 'locator',
 							locator: '[name="credentials.passcode"]'
 						},
-						value: '{{password}}',
+						value: '{{_password}}',
 						enter: true
 					}
 				]
@@ -63,12 +63,17 @@ const response = await fetch('http://localhost:3000/v1/play', {
 					locateBy: 'locator',
 					locator: 'body'
 				},
-				transform: '$eval($).*.releves.{"date": journeeGaziere, "kwh": energieConsomme}',
+				output: 'resultConso'
+			}/*,
+			{
+				action: 'transform',
+				input: 'resultConso',
+				expression: '$eval($).*.releves.{"date": journeeGaziere, "kwh": energieConsomme}',
 				output: 'conso'
-			}
+			}*/
 		],
 		output: {
-			content: 'conso'
+			expression: '$eval(resultConso).*.releves.{"date": journeeGaziere, "kwh": energieConsomme}'
 		}
 	})
 })
