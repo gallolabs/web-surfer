@@ -4,6 +4,7 @@ const response = await fetch('http://localhost:3000/v1/play', {
       "Content-Type": "application/json",
     },
 	body: JSON.stringify({
+		engine: 'botJSON',
 		browser: 'firefox',
 		session: {
 			id: 'abc',
