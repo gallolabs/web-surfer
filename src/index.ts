@@ -71,11 +71,13 @@ class GameEngineV1 {
     getSchema() {
         const actions = this.actions
 
-        return {
+        const schemaBotJSON = {
+            $id: 'botJSON',
             required: ['steps'],
             type: 'object',
             properties: {
-                browser: { enum: ['firefox', 'chrome', 'webkit', 'chromium'] },
+                engine: { enum: ['botJSON'], type: 'string' },
+                browser: { enum: ['firefox', 'chrome', 'webkit', 'chromium'], type: 'string' },
                 session: {
                     type: 'object',
                     properties: {
@@ -96,7 +98,7 @@ class GameEngineV1 {
                     //         ...actions[actionName].paramsSchema,
                     //         required: ['type'].concat(actions[actionName].paramsSchema.required || []),
                     //         properties: {
-                    //             type: {enum: [actionName]},
+                    //             type: {enum: [actionName], type: 'string'},
                     //             ...actions[actionName].paramsSchema.properties
                     //         }
                     //     }))
@@ -116,6 +118,38 @@ class GameEngineV1 {
                     }
                 }
             }
+        }
+
+        const schemaBotQL = {
+            $id: 'botQL',
+            required: ['expression'],
+            type: 'object',
+            properties: {
+                engine: { enum: ['botQL'], type: 'string' },
+                browser: { enum: ['firefox', 'chrome', 'webkit', 'chromium'], type: 'string' },
+                session: {
+                    type: 'object',
+                    properties: {
+                        id: { type: 'string' },
+                        ttl: { type: 'integer'}
+                    },
+                    required: ['id']
+                },
+                variables: {
+                    type: 'object'
+                },
+                expression: {type: 'string'}
+            }
+        }
+
+        fastify.addSchema(schemaBotJSON);
+        fastify.addSchema(schemaBotQL);
+
+        return {
+            oneOf: [
+                { $ref: 'botJSON#' },
+                { $ref: 'botQL#' }
+            ]
         }
     }
 
