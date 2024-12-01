@@ -14,6 +14,8 @@ const fastify = Fastify({logger: true})
 
 import jsonata from 'jsonata'
 
+import { fileTypeFromBuffer } from 'file-type'
+
 class GameEngineV1 {
     actions = {
         goto: {
@@ -41,13 +43,9 @@ class GameEngineV1 {
                     url = url.replace('{'+key+'}', encodeURIComponent(data[key]))
                 })
 
+                const response = await page.goto(url)
 
-                const [[r]] = await Promise.all([
-                    once(page, 'response'),
-                    page.goto(url)
-                ])
-
-                if (r.status() >= 400) {
+                if (response.status() >= 300 || response.status() < 200) {
                     throw new Error('Invalid status ' + r.status())
                 }
 
@@ -153,7 +151,156 @@ class GameEngineV1 {
         }
     }
 
+    async playQLGame(game, tracingId) {
+        const tracing: any[] = []
+        tracings[tracingId] = tracing
+
+        let content
+        let contentType
+        let browser
+        let page
+
+        try {
+
+            const parsedExpression = jsonata('(' + game.expression + ')')
+
+            const launchArgs = JSON.stringify({
+              headless: false,
+              //stealth: true,
+              args: [
+                "--full-screen", "--use-gl=angle", "--use-angle=gl", "--enable-unsafe-webgpu", '-use-angle=swiftshader',
+                "--lang=fr_FR", "--accept-lang=fr-FR", "--disable-blink-features=AutomationControlled"
+                ],
+              devtools: false
+            });
+
+            const cookiesPath = game.session?.id ? game.session?.id + '.json' : null;
+
+            const browserName = game.browser || 'firefox'
+            const playwrightLib = (() => {
+                switch (browserName) {
+                    case 'chrome':
+                    case 'chromium':
+                        return chromium
+                    case 'firefox':
+                        return firefox
+                    case 'webkit':
+                        return webkit
+                    default:
+                        throw new Error('Invalid browser ' + browserName)
+                }
+            })()
+
+            browser = await playwrightLib.connect('ws://lapdell:3000/'+browserName+'/playwright?token=6R0W53R135510&launch=' + launchArgs)
+
+            tracing.push('Connected to ' + game.browser)
+
+            const context = await browser.newContext({
+               // ...devices['Desktop Firefox'],
+                viewport: { width: 1920, height: 945 },
+                screen: { width: 1920, height: 1080 },
+                locale: 'fr_FR',
+                timezoneId: 'Europe/Paris'
+            });
+
+            context.setDefaultTimeout(5000)
+
+            if (cookiesPath && fs.existsSync(cookiesPath)) {
+                const cookies = JSON.parse(fs.readFileSync(cookiesPath, {encoding: 'utf8'}));
+                await context.addCookies(cookies);
+                tracing.push('Reusing cookies for ' + game.session?.id)
+            } else if (cookiesPath) {
+                tracing.push('New cookies for ' + game.session?.id)
+            }
+
+            await context.addInitScript(() => {
+                Object.defineProperty(navigator, 'webdriver', {get: () => undefined})
+            })
+
+            parsedExpression.registerFunction('goto', async (url, referer) => {
+
+                if (page) {
+                    await page.close()
+                }
+
+                page = await context.newPage({
+                    extraHTTPHeaders: {
+                        Referer: referer
+                    }
+                })
+
+                const response = await page.goto(url)
+
+                if (response.status() >= 300 || response.status() < 200) {
+                    throw new Error('Invalid status ' + r.status())
+                }
+
+                await page.waitForTimeout(1000);
+
+                await page.mouse.move(500, 600, { steps: 10 });
+
+                await page.evaluate(() => {
+                    window.scrollBy(0, window.innerHeight / 2);  // Scroller la page
+                });
+
+                return await page.url()
+
+            }, '<ss?:s>')
+
+            parsedExpression.registerFunction('extractText', async (locator) => {
+               return await page.locator(locator).textContent()
+            }, '<s:s>')
+
+            parsedExpression.registerFunction('screenshot', async () => {
+                return await page.screenshot()
+            }, '<:o>')
+
+            parsedExpression.registerFunction('url', (url, binds) => {
+                Object.keys(binds).forEach(key => {
+                    // uri template
+                    url = url.replace('{'+key+'}', encodeURIComponent(binds[key]))
+                })
+                return url
+            }, '<so:s>')
+
+            content = await parsedExpression.evaluate(game.variables || {})
+
+            if (content instanceof Buffer) {
+                const type = await fileTypeFromBuffer(content)
+                contentType = type?.mime
+            }
+
+        } catch (e) {
+            console.error(e)
+            tracing.push(e)
+            if (browser && page) {
+                try {
+                    tracing.push(await page.screenshot())
+                } catch(e) {
+                    tracing.push('Unable to screenshot : ' + e.message)
+                }
+            }
+            throw e
+        } finally {
+            try {
+                await browser.close()
+            } catch (e) {
+                console.error(e)
+            }
+        }
+
+        return {
+            tracing,
+            content,
+            contentType
+        }
+    }
+
     async play(game, tracingId) {
+
+        if (game.engine === 'botQL') {
+            return this.playQLGame(game, tracingId)
+        }
 
         const tracing: any[] = []
         tracings[tracingId] = tracing
