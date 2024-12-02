@@ -23,7 +23,8 @@ const response = await fetch('http://localhost:3000/v1/play', {
 				'copyright': $copyright,
 				'ip': $extractText('#ipv4'),
 				'country': $extractText('.ip-information .information:last-child span:last-child'),
-				'screenshot': $screenshot()
+				'screenshot': $screenshot(),
+				'yesterday': $date().subtract(1, 'day')
 			};
 		`
 	})

@@ -16,6 +16,8 @@ import jsonata from 'jsonata'
 
 import { fileTypeFromBuffer } from 'file-type'
 
+import dayjs from 'dayjs'
+
 class GameEngineV1 {
     actions = {
         goto: {
@@ -262,6 +264,10 @@ class GameEngineV1 {
                 })
                 return url
             }, '<so:s>')
+
+            parsedExpression.registerFunction('date', (sDate) => {
+                return dayjs(sDate)
+            }, '<s?:(so)>')
 
             content = await parsedExpression.evaluate(game.variables || {})
 
