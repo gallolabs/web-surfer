@@ -157,9 +157,11 @@ class GameEngineV1 {
         const tracing: any[] = []
         tracings[tracingId] = tracing
 
+        const sessionPath = game.session?.id ? game.session?.id + '.json' : null;
         let content
         let contentType
         let browser
+        let context
         let page
 
         try {
@@ -176,7 +178,6 @@ class GameEngineV1 {
               devtools: false
             });
 
-            const cookiesPath = game.session?.id ? game.session?.id + '.json' : null;
 
             const browserName = game.browser || 'firefox'
             const playwrightLib = (() => {
@@ -197,23 +198,28 @@ class GameEngineV1 {
 
             tracing.push('Connected to ' + game.browser)
 
-            const context = await browser.newContext({
+            let storageState
+
+            if (sessionPath && fs.existsSync(sessionPath)) {
+                storageState = JSON.parse(fs.readFileSync(sessionPath, {encoding: 'utf8'}));
+                // await context.addCookies(cookies);
+                tracing.push('Reusing session for ' + game.session?.id)
+            } else if (sessionPath) {
+                tracing.push('New session for ' + game.session?.id)
+            }
+
+            context = await browser.newContext({
                // ...devices['Desktop Firefox'],
                 viewport: { width: 1920, height: 945 },
                 screen: { width: 1920, height: 1080 },
                 locale: 'fr_FR',
-                timezoneId: 'Europe/Paris'
+                timezoneId: 'Europe/Paris',
+                // geolocation
+                // proxy
+                storageState,
             });
 
             context.setDefaultTimeout(5000)
-
-            if (cookiesPath && fs.existsSync(cookiesPath)) {
-                const cookies = JSON.parse(fs.readFileSync(cookiesPath, {encoding: 'utf8'}));
-                await context.addCookies(cookies);
-                tracing.push('Reusing cookies for ' + game.session?.id)
-            } else if (cookiesPath) {
-                tracing.push('New cookies for ' + game.session?.id)
-            }
 
             await context.addInitScript(() => {
                 Object.defineProperty(navigator, 'webdriver', {get: () => undefined})
@@ -289,10 +295,16 @@ class GameEngineV1 {
             throw e
         } finally {
             try {
-                await browser.close()
+                context && await context.close()
+                browser && await browser.close()
             } catch (e) {
                 console.error(e)
             }
+        }
+
+        if (sessionPath) {
+            const storageState = await context.storageState();
+            fs.writeFileSync(sessionPath, JSON.stringify(storageState, null, 2));
         }
 
         return {
