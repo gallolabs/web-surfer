@@ -17,9 +17,12 @@ const response = await fetch('http://localhost:3000/v1/play', {
 				'browser': 'firefox',
 				'session': {'id': 'abc', 'ttl': 3600},
 				'i18nPreset': 'FR', /* proxy + (geoloc) + locale + timezone */
+				/* url: xxxx */
 			});
 
-			$goTo('https://myenergyspace.com');
+			$myUrl := $goTo('https://myenergyspace.com');
+
+			$myUrl := $readUrl()
 
 			$fill({
 				username: 'hello',
@@ -32,6 +35,15 @@ const response = await fetch('http://localhost:3000/v1/play', {
 				"warning": $readTextOf('div.warning'),
 				"screenshot": $screenshot()
 			};
+
+			$openNewTab({
+				url: ....
+			})
+
+			/* On the new tab */
+			$fill('.search', 'my search')
+
+			$backToPreviousTab()
 
 
 			$surfing := $webSurf({

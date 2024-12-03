@@ -7,6 +7,9 @@ A POC for a scraping tool through API. In development.
 
 ## POST /surf with SurfQL
 
+- Hight level API with functions, with simple naming like human actions (I go to, I click on, I fill, I read something, etc)
+- Low level API with object returned by $startSurfing()
+
 ```application/json
 {
     "variables": {
