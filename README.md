@@ -3,99 +3,42 @@
   <p align="center"><strong>Web Surfer</strong></p>
 </p>
 
-A POC for a scraping tool through API.
+A POC for a scraping tool through API. In development.
 
-## Engines
-
-### BotQL
+## POST /surf with SurfQL
 
 ```application/json
 {
-    engine: 'botQL',
-    browser: 'firefox',
-    session: {
-        id: 'abc',
-        ttl: 3600
+    "variables": {
+        "energyUrl": 'https://myenergyspace.com'
     },
-    variables: {
-        url: 'https://whatismyipaddress.com/fr/mon-ip'
-    },
-    expression: `
-        $goto(url);
-        $copyright := $extractText('.copyright');
+    "expression": `
+        /* I start my firefox browser */
+        $startSurfing({
+            'browser': 'firefox',
+            'session': {'id': 'abc', 'ttl': 3600},
+            'i18nPreset': 'FR', /* proxy + (geoloc) + locale + timezone */
+        });
+
+        /* I go to my url in the current tab */
+        $myUrl := $goTo(energyUrl);
+
+        if ($contains($myUrl, 'connexion')) {
+            /* I fill the login form if I am not logged */
+            $fill({
+                username: 'hello',
+                password: 'world'
+            }, { pressEnter: true });
+        }
+
+        /* I click on a button to reach my page */
+        $clickOn('My Consumption');
+
+        /* I obtain the content of the warning and a screenshot */
         {
-            'copyright': $copyright,
-            'ip': $extractText('#ipv4'),
-            'country': $extractText('.ip-information .information:last-child span:last-child')
+            "warning": $readTextOf('div.warning'),
+            "screenshot": $screenshot()
         };
     `
-}
-```
-
-### BotJSON
-
-```application/json
-{
-    engine: 'botJSON',
-    browser: 'firefox',
-    session: {
-        id: 'abc',
-        ttl: 3600
-    },
-    steps: [
-        {
-            action: 'goto',
-            url: 'https://whatismyipaddress.com/fr/mon-ip'
-        },
-        {
-            action: 'click',
-            skipMissingElement: true,
-            element: {
-                locateBy: 'role',
-                role: 'button',
-                name: 'AGREE'
-            }
-        },
-        {
-            action: 'extractText',
-            element: {
-                locateBy: 'locator',
-                locator: '#ipv4'
-            },
-            output: 'ipv4'
-        },
-        {
-            action: 'extractText',
-            element: {
-                locateBy: 'locator',
-                locator: '.ip-information .information:last-child span:last-child'
-            },
-            output: 'country'
-        },
-        {
-            action: 'fill',
-            element: {
-                locateBy: 'locator',
-                locator: '.search-field'
-            },
-            value: '{{ipv4}}',
-            enter: true
-        },
-        {
-            action: 'extractText',
-            element: {
-                locateBy: 'locator',
-                locator: '.ip-information .information:nth-child(2) span:last-child'
-            },
-            output: 'hostname'
-        }
-    ],
-    output: {
-        content: {
-            ip: 'ipv4',
-            country: 'country',
-            host: 'hostname'
-        }
-    }
 }
 ```

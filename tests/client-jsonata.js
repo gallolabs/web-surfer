@@ -13,16 +13,43 @@ const response = await fetch('http://localhost:3000/v1/play', {
 		},
 		expression: `
 
-			$webSurf({
+			$startSurfing({
+				'browser': 'firefox',
+				'session': {'id': 'abc', 'ttl': 3600},
+				'i18nPreset': 'FR', /* proxy + (geoloc) + locale + timezone */
+			});
+
+			$goTo('https://myenergyspace.com');
+
+			$fill({
+				username: 'hello',
+				password: 'world'
+			}, { pressEnter: true });
+
+			$clickOn('My Consumption');
+
+			{
+				"warning": $readTextOf('div.warning'),
+				"screenshot": $screenshot()
+			};
+
+
+			$surfing := $webSurf({
 				url: 'blabla'
 			})
 
-			$fill({
+			$surfing.fill({
 				username: 'hello',
 				password: 'world'
 			})
 
 			$clickOn('Login')
+
+			$newPage := $surfing.newPage()
+
+			$newPage.fill()
+
+			$newPage.findElement('xxxx').fill()
 
 			$browserSession := $browser('firefox', {
 				'browser': 'firefox',
