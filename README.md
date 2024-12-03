@@ -1,5 +1,5 @@
 <p align="center">
-    <img height="200" src="https://raw.githubusercontent.com/gallolabs/bobot/main/logo_w300.jpeg">
+    <img height="300" src="https://raw.githubusercontent.com/gallolabs/bobot/main/logo_w300.jpeg">
   <p align="center"><strong>Web Surfer</strong></p>
 </p>
 
