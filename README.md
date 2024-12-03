@@ -1,6 +1,6 @@
 <p align="center">
     <img height="300" src="https://raw.githubusercontent.com/gallolabs/bobot/main/logo_w300.jpeg">
-  <br/><font size=6><strong>Web Surfer</strong></font>
+  <h1 align="center">Web Surfer</h1>
 </p>
 
 A POC for a scraping tool through API. In development.
