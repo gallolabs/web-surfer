@@ -1,7 +1,5 @@
-import Fastify from 'fastify'
-import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox'
-import {WebSurfer, WebSurferConfig, webSurfDefinitionSchema, WebSurfRuntimeError, InvalidWebSurfDefinitionError} from './web-surfer.js'
-
+import {WebSurfer, WebSurferConfig} from './web-surfer.js'
+import server from './http.js'
 
 const config: WebSurferConfig = {
     defaultBrowser: 'firefox',
@@ -13,32 +11,5 @@ const config: WebSurferConfig = {
     }
 }
 
-const fastify = Fastify({logger: true}).withTypeProvider<TypeBoxTypeProvider>()
 const webSurfer = new WebSurfer(config)
-
-fastify.post('/surf', {schema:{body: webSurfDefinitionSchema}}, async (request, reply) => {
-    try {
-        const result = await webSurfer.surf(request.body)
-
-        return result
-    } catch (e) {
-        if (e instanceof InvalidWebSurfDefinitionError) {
-            reply.code(400)
-
-            return e
-        }
-        if (!(e instanceof WebSurfRuntimeError)) {
-            throw e
-        }
-
-        reply.code(500)
-
-        return {
-            message: e.message,
-            details: e.details
-        }
-    }
-})
-
-await fastify.listen({ port: 3000 })
-
+await server(webSurfer)

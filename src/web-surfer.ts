@@ -1,10 +1,11 @@
 import { Type, Static } from '@sinclair/typebox'
-//import { firefox, webkit, chromium/*, devices */} from 'playwright'
 import jsonata from 'jsonata'
 import {Ajv} from 'ajv'
-import { Browser, BrowserContext, BrowserType, Page, firefox } from 'playwright'
+import { Browser, BrowserContext, BrowserType, Page, firefox, webkit, chromium } from 'playwright'
 
 const browsersSchema = Type.Union([Type.Literal('firefox'), Type.Literal('chrome'), Type.Literal('chromium'), Type.Literal('webkit')])
+
+type BrowserName = Static<typeof browsersSchema>
 
 export const webSurferConfigSchema = Type.Object({
     defaultBrowser: browsersSchema,
@@ -37,7 +38,11 @@ export class InvalidWebSurfDefinitionError extends Error {
 
 type Method = (...args: any[]) => any;
 
-const surfQLApi = {}
+const surfQLApi: Record<string, {
+	description: string
+	arguments: any[]
+	returns: any
+}> = {}
 
 function api(desc: any): Method {
 	return <T extends Method>(value: T): Method => {
@@ -68,18 +73,43 @@ class WebSurf {
 	protected config: WebSurferConfig
 
 	constructor(config: WebSurferConfig) {
-		this.goto = this.goto.bind(this)
+		Object.keys(surfQLApi).forEach(fn => {
+			const methodName = fn.substring(1)
+			// @ts-ignore
+			this[methodName] = this[methodName].bind(this)
+		})
 		this.config = config
+	}
+
+	public async destroy() {
+		// To do end contexts and browsers
+	}
+
+	public hasCurrentPage() {
+		return !!this.currentPage
 	}
 
 	@api({
 		description: 'Go to URL',
-		arguments: [[Type.String()]],
+		arguments: [[
+			Type.String({title: 'url', description: 'The url you want to reach'}),
+			Type.Optional(Type.Object({}, {title: 'options', description: 'options'}))
+		]],
 		returns: undefined
 	})
 	public async goto(url: string) {
 		const page = await this.getCurrentPage()
 		await page.goto(url)
+	}
+
+	@api({
+		description: 'Take a screenshot',
+		arguments: [[]],
+		returns: {type: 'binary', description: 'The snapshot'}
+	})
+	public async screenshot() {
+		const page = await this.getCurrentPage()
+		return await page.screenshot()
 	}
 
 	protected async getCurrentPage(): Promise<Page> {
@@ -109,13 +139,16 @@ class WebSurf {
 		return this.currentBrowser
 	}
 
-	protected getBrowserName(): 'firefox' {
-		return 'firefox'
+	protected getBrowserName(): BrowserName {
+		return this.config.defaultBrowser
 	}
 
-	protected getPlayrightLib(browserName: 'firefox'): BrowserType {
+	protected getPlayrightLib(browserName: BrowserName): BrowserType {
 		return {
-			firefox
+			firefox,
+			chromium,
+			webkit,
+			chrome: chromium
 		}[browserName]
 	}
 }
@@ -130,14 +163,40 @@ export class WebSurfer {
     public async surf(surfDefinition: WebSurfDefinitionSchema): Promise<WebSurfResult> {
 		const parsedExpression = this.parseExpression(surfDefinition.expression)
 		const variables = surfDefinition.variables || {}
+		const surf = new WebSurf(this.config)
 
 		try {
-			return await parsedExpression.evaluate(variables, new WebSurf(this.config))
+			return await parsedExpression.evaluate(variables, surf)
 		} catch (e) {
-			if ((e as any).code === 'T1006') {
-				throw new InvalidWebSurfDefinitionError((e as Error).message + ' ('+(e as any).token+')')
+			if (e instanceof Object && !(e instanceof Error) && (e as any).code && (e as any).token) {
+				const jsonataError: {code: string, token: string, message: string} = e as any
+
+				if (jsonataError.code === 'T1006') {
+					throw new InvalidWebSurfDefinitionError((e as Error).message + ' ('+(e as any).token+')')
+				}
+
+				throw jsonataError
 			}
-			throw e
+
+			let screenshot
+			if (surf.hasCurrentPage()) {
+				try { screenshot = await surf.screenshot() } catch (e) { screenshot = (e as Error).message }
+			}
+
+			if (e instanceof Error && (e as any).token && (e as any).position !== undefined) {
+				const jsonataError: {token: string, message: string} = e as any
+
+				throw new WebSurfRuntimeError(jsonataError.token + ' : ' + jsonataError.message, {cause: e, details: {
+					screenshot
+				}})
+			}
+
+			throw new WebSurfRuntimeError((e as Error).message, {cause: e, details: {
+				screenshot
+			}})
+
+		} finally {
+			surf.destroy().catch(console.error)
 		}
     }
 
@@ -151,4 +210,4 @@ export class WebSurfer {
 
 }
 
-console.log('API', surfQLApi)
+export const surfQLApiDoc = surfQLApi
