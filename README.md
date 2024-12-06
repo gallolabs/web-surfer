@@ -56,3 +56,7 @@ Cases :
 - Output is object/boolean : application/json
 
 When output contains string (text/plain or application/json), binary data will be represented as base64 by default.
+
+## Help
+
+Go to http://localhost:3000/doc for OpenAPI doc with surfQL available methods.
