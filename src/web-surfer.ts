@@ -38,16 +38,20 @@ export class InvalidWebSurfDefinitionError extends Error {
 
 type Method = (...args: any[]) => any;
 
-const surfQLApi: Record<string, {
+interface SurfQLApiItem {
 	description: string
 	arguments: any[]
 	returns: any
-}> = {}
+}
 
-function api(desc: any): Method {
+const surfQLApi: Record<string, SurfQLApiItem> = {}
+
+function api(desc: SurfQLApiItem): Method {
 	return <T extends Method>(value: T): Method => {
+		const fnName = value.name
+
 		// @ts-ignore
-		surfQLApi['$' + value.name] = desc
+		surfQLApi['$' + fnName] = desc
 
 		return function (this: any, ...args: any[]): T {
 
@@ -60,13 +64,14 @@ function api(desc: any): Method {
 				}
 			}
 
-			throw new InvalidWebSurfDefinitionError(value.name + ' : invalids arguments')
+			throw new InvalidWebSurfDefinitionError(fnName + ' : invalids arguments')
 		};
 	};
 }
 
 class WebSurf {
 	protected browsers: Record<string, Browser> = {}
+	protected contexts: BrowserContext[] = []
 	protected currentBrowser?: Browser
 	protected currentContext?: BrowserContext
 	protected currentPage?: Page
@@ -83,6 +88,13 @@ class WebSurf {
 
 	public async destroy() {
 		// To do end contexts and browsers
+		const errs: any[] = []
+		await Promise.all(this.contexts.map(c => c.close().catch(e => errs.push(e))))
+		await Promise.all(Object.keys(this.browsers).map(bn => this.browsers[bn].close().catch(e => errs.push(e))))
+
+		if (errs.length > 0) {
+			throw new Error('Destroy problem', {cause: errs})
+		}
 	}
 
 	public hasCurrentPage() {
@@ -124,23 +136,29 @@ class WebSurf {
 		if (!this.currentContext) {
 			const browser = await this.getCurrentBrowser()
 			this.currentContext = await browser.newContext()
+			this.contexts.push(this.currentContext)
 		}
 		return this.currentContext
 	}
 
 	protected async getCurrentBrowser(): Promise<Browser> {
 		if (!this.currentBrowser) {
-			const browserName = this.getBrowserName()
-			const browserOpts = encodeURIComponent(JSON.stringify({}))
-			this.currentBrowser = await this
-				.getPlayrightLib(browserName)
-				.connect(this.config.browserLaunchers[browserName].replace('{options}', browserOpts))
+			this.currentBrowser = await this.getBrowser()
 		}
 		return this.currentBrowser
 	}
 
-	protected getBrowserName(): BrowserName {
-		return this.config.defaultBrowser
+	protected async getBrowser(browserName?: BrowserName): Promise<Browser> {
+	    browserName = browserName || this.config.defaultBrowser
+
+		if (!this.browsers[browserName]) {
+			const browserOpts = encodeURIComponent(JSON.stringify({}))
+			const browser = await this
+				.getPlayrightLib(browserName)
+				.connect(this.config.browserLaunchers[browserName].replace('{options}', browserOpts))
+			this.browsers[browserName] = browser
+		}
+		return this.browsers[browserName]
 	}
 
 	protected getPlayrightLib(browserName: BrowserName): BrowserType {
