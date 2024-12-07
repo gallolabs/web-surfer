@@ -3,6 +3,8 @@ import jsonata from 'jsonata'
 import {Ajv} from 'ajv'
 import { Browser, BrowserContext, BrowserType, Page, firefox, webkit, chromium } from 'playwright'
 import { readFile, writeFile } from 'fs/promises'
+import { OptionalKind } from '@sinclair/typebox'
+import dayjs, { Dayjs } from 'dayjs'
 
 const browsersSchema = Type.Union([Type.Literal('firefox'), Type.Literal('chrome'), Type.Literal('chromium'), Type.Literal('webkit')])
 
@@ -55,17 +57,27 @@ function api(desc: SurfQLApiItem): Method {
 		surfQLApi[fnName] = desc
 
 		return function (this: any, ...args: any[]): T {
+			let lastErrors
 
 			for (let schema of desc.arguments) {
+				const minItems = schema.filter((s: any) => !s[OptionalKind]).length
 				schema = Type.Tuple(schema)
-				const validate = (new Ajv).compile(schema)
+				schema.minItems = minItems
+				const validate = (new Ajv({strictTuples: false})).compile(schema)
 
-				if (validate(args)) {
-					return value.call(this, ...args) as unknown as T;
+				try {
+					if (validate(args)) {
+						return value.call(this, ...args) as unknown as T;
+					} else {
+						lastErrors = validate.errors
+					}
+
+				} catch (e) {
+					lastErrors = validate.errors
 				}
 			}
 
-			throw new InvalidWebSurfDefinitionError(fnName + ' : invalids arguments')
+			throw new InvalidWebSurfDefinitionError(fnName + ' : invalids arguments ' + JSON.stringify(lastErrors))
 		};
 	};
 }
@@ -105,9 +117,9 @@ class WebSurf {
 
 	constructor(config: WebSurferConfig) {
 		Object.keys(surfQLApi).forEach(fn => {
-			const methodName = fn.substring(1)
+			const methodName = fn
 			// @ts-ignore
-			this[methodName] = this[methodName].bind(this)
+			this[methodName.substring(1)] = this[methodName].bind(this)
 		})
 		this.config = config
 	}
@@ -212,7 +224,7 @@ class WebSurf {
 		]],
 		returns: undefined
 	})
-	public async $goto(url: string, {referer}: {referer?: string} = {}) {
+	public async $goTo(url: string, {referer}: {referer?: string} = {}) {
 		const page = await this.getCurrentPage()
 		const response = await page.goto(url, {referer})
 
@@ -230,6 +242,64 @@ class WebSurf {
 	}
 
 	@api({
+		description: 'Create a new dayjs date',
+		arguments: [[
+			Type.Optional(Type.String({title: 'date', description: 'The date'}))
+		]],
+		returns: {type: 'Dayjs', description: 'A Dayjs date object'}
+	})
+	public $date(date?: string): Dayjs {
+		return dayjs(date)
+	}
+
+	@api({
+		description: 'Fill an input',
+		arguments: [[
+			Type.String({title: 'locator', description: 'The field locator'}),
+			Type.String({title: 'value', description: 'The value to fill'}),
+			Type.Optional(Type.Object({
+				pressEnter: Type.Optional(Type.Boolean({description: 'Press enter after fill'}))
+			}, {title: 'options', description: 'The fill options'}))
+		]],
+		returns: undefined
+	})
+	public async $fill(locator: string, value: string, {pressEnter}: {pressEnter?: boolean} = {}) {
+		const page = await this.getCurrentPage()
+		const el = await page.locator(locator)
+
+		await el.pressSequentially(value, {delay: 300})
+
+		await page.waitForTimeout(300);
+
+		if (pressEnter) {
+			// page.keyboard.press('Enter')
+			await el.press('Enter')
+
+	        await page.waitForTimeout(1000);
+
+	        await page.mouse.move(500, 600, { steps: 10 });
+
+	        await page.evaluate(() => {
+	            window.scrollBy(0, window.innerHeight / 2);  // Scroller la page
+	        });
+		} else {
+			await page.waitForTimeout(600);
+		}
+	}
+
+	@api({
+		description: 'Read a text',
+		arguments: [[
+			Type.String({title: 'locator', description: 'The field locator'}),
+		]],
+		returns: Type.String({description: 'The text'})
+	})
+	public async $readText(locator: string): Promise<string> {
+		const page = await this.getCurrentPage()
+		return await page.locator(locator).textContent() as string
+	}
+
+	@api({
 		description: 'Read current URL',
 		arguments: [[]],
 		returns: Type.String({description: 'The url'})
@@ -237,6 +307,32 @@ class WebSurf {
 	public async $readUrl(): Promise<string> {
 		const page = await this.getCurrentPage()
 		return await page.url()
+	}
+
+	@api({
+		description: 'Build url from template and variables',
+		arguments: [[
+			Type.String({title: 'template', description: 'The template (ex: http//www.google.fr/{?q})', examples: ['http//www.google.fr/{?q}']}),
+			Type.Record(Type.String(), Type.Any(), {title: 'variables', description: 'The variables used to fill the template'})
+		]],
+		returns: Type.String({description: 'The built url'})
+	})
+	public $buildUrl(template: string, variables: Record<string, any>): string {
+	    Object.keys(variables).forEach(key => {
+	        // uri template
+	        template = template.replace('{'+key+'}', encodeURIComponent(variables[key]))
+	    })
+	    return template
+	}
+
+	@api({
+		description: 'Click on an element',
+		arguments: [[Type.String({title: 'locator', description: 'The element locator'})]],
+		returns: undefined
+	})
+	public async $clickOn(locator: string) {
+		const page = await this.getCurrentPage()
+		await page.locator(locator).click()
 	}
 
 	@api({
@@ -317,6 +413,7 @@ export class WebSurfer {
 		try {
 			return await parsedExpression.evaluate(variables, surf)
 		} catch (e) {
+							console.log(e)
 			if (e instanceof Object && !(e instanceof Error) && (e as any).code && (e as any).token) {
 				const jsonataError: {code: string, token: string, message: string} = e as any
 
@@ -335,7 +432,7 @@ export class WebSurfer {
 			if (e instanceof Error && (e as any).token && (e as any).position !== undefined) {
 				const jsonataError: {token: string, message: string} = e as any
 
-				throw new WebSurfRuntimeError(jsonataError.token + ' : ' + jsonataError.message, {cause: e, details: {
+				throw new WebSurfRuntimeError('$' + jsonataError.token + ' : ' + jsonataError.message, {cause: e, details: {
 					screenshot
 				}})
 			}
