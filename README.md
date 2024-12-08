@@ -12,7 +12,7 @@ A POC for a scraping tool through API. In development.
 
 ### Example : Search on Google, extract a text and take a screenshot
 
-```application/json
+```javascript
 {
     expression: `
 
@@ -35,7 +35,7 @@ We will receive a JSON with a description (an extracted text) and a sreenshot ba
 
 ### Example : Extract and transform Gaz consumption from GRDF
 
-```application/json
+```javascript
 {
     variables: {
         compteur,
