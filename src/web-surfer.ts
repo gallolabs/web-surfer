@@ -5,6 +5,7 @@ import { Browser, BrowserContext, BrowserType, Page, firefox, webkit, chromium }
 import { readFile, writeFile } from 'fs/promises'
 import { OptionalKind } from '@sinclair/typebox'
 import dayjs, { Dayjs } from 'dayjs'
+import * as duration from 'duration-fns'
 
 const browsersSchema = Type.Union([Type.Literal('firefox'), Type.Literal('chrome'), Type.Literal('chromium'), Type.Literal('webkit')])
 
@@ -114,6 +115,7 @@ class WebSurf {
 	protected currentContext?: BrowserContext
 	protected currentPage?: Page
 	protected config: WebSurferConfig
+	protected writeSessions: Function[] = []
 
 	constructor(config: WebSurferConfig) {
 		Object.keys(surfQLApi).forEach(fn => {
@@ -122,6 +124,10 @@ class WebSurf {
 			this[methodName.substring(1)] = this[methodName].bind(this)
 		})
 		this.config = config
+	}
+
+	public async saveSessions() {
+		await Promise.all(this.writeSessions.map(fn => fn()))
 	}
 
 	public async destroy() {
@@ -146,7 +152,7 @@ class WebSurf {
 				browser: Type.Optional(browsersSchema),
 				session: Type.Optional(Type.Object({
 					id: Type.String(),
-					ttl: Type.Integer()
+					ttl: Type.String({pattern: '^P[A-Z0-9]{2,}$'})
 				}, {description: 'The surf session'})),
 				i18nPreset: Type.Optional(Type.String({description: 'The preset for i18n (timezone, locale, geoloc)'}))
 			}, {title: 'options', description: 'Surf options'}))
@@ -155,7 +161,7 @@ class WebSurf {
 	})
 	public async $startSurfing(
 		{browser: browserName, session, i18nPreset: i18nPresetName}:
-		{browser?: BrowserName, session?: { id: string, ttl: number}, i18nPreset?: string} = {}
+		{browser?: BrowserName, session?: { id: string, ttl: string}, i18nPreset?: string} = {}
 	) {
 		const browser = await this.getBrowser(browserName)
 		this.currentBrowser = browser
@@ -179,22 +185,24 @@ class WebSurf {
             }
         })
 
-        context.setDefaultTimeout(5000)
+        context.setDefaultTimeout(10000)
 
         await context.addInitScript(() => {
             Object.defineProperty(navigator, 'webdriver', {get: () => undefined})
         })
 
         if (session) {
-        	context.once('close', async () => this.writeSession(session.id, session.ttl, await context.storageState()))
+        	this.writeSessions.push(async () => {
+        		this.writeSession(session.id, session.ttl, await context.storageState())
+        	})
         }
 
 		this.contexts.push(this.currentContext = context)
 	}
 
-	protected async writeSession(id: string, ttl: number, content: object) {
+	protected async writeSession(id: string, ttl: string, content: object) {
 		await writeFile(id + '.json', JSON.stringify({
-			expires: (new Date).getTime() + ttl,
+			expires: duration.apply(new Date, duration.parse(ttl)).getTime(),
 			content
 		}, null, 2))
 	}
@@ -267,7 +275,7 @@ class WebSurf {
 		const page = await this.getCurrentPage()
 		const el = await page.locator(locator)
 
-		await el.pressSequentially(value, {delay: 300})
+		await el.pressSequentially(value, {delay: 200})
 
 		await page.waitForTimeout(300);
 
@@ -411,7 +419,9 @@ export class WebSurfer {
 		const surf = new WebSurf(this.config)
 
 		try {
-			return await parsedExpression.evaluate(variables, surf)
+			const v = await parsedExpression.evaluate(variables, surf)
+			await surf.saveSessions().catch(e => console.error(e))
+			return v
 		} catch (e) {
 							console.log(e)
 			if (e instanceof Object && !(e instanceof Error) && (e as any).code && (e as any).token) {
@@ -450,7 +460,8 @@ export class WebSurfer {
     	try {
     		return jsonata('(' + expression + ')')
     	} catch (e) {
-    		throw new InvalidWebSurfDefinitionError((e as Error).message)
+    		console.error(e)
+    		throw new InvalidWebSurfDefinitionError('SurfQL parsing error : ' + (e as Error).message + ((e as any).position ? ', position ' + (e as any).position: ''))
     	}
     }
 
