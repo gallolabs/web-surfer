@@ -6,6 +6,7 @@ import { readFile, writeFile } from 'fs/promises'
 import { OptionalKind } from '@sinclair/typebox'
 import dayjs, { Dayjs } from 'dayjs'
 import * as duration from 'duration-fns'
+import { cloneDeep } from 'lodash-es'
 
 const browsersSchema = Type.Union([Type.Literal('firefox'), Type.Literal('chrome'), Type.Literal('chromium'), Type.Literal('webkit')])
 
@@ -68,6 +69,7 @@ function api(desc: SurfQLApiItem): Method {
 
 				try {
 					if (validate(args)) {
+						this.called$Fns.push(value.name)
 						return value.call(this, ...args) as unknown as T;
 					} else {
 						lastErrors = validate.errors
@@ -116,6 +118,8 @@ class WebSurf {
 	protected currentPage?: Page
 	protected config: WebSurferConfig
 	protected writeSessions: Function[] = []
+	protected userDebug: any[] = []
+	protected called$Fns: any[] = []
 
 	constructor(config: WebSurferConfig) {
 		Object.keys(surfQLApi).forEach(fn => {
@@ -143,6 +147,25 @@ class WebSurf {
 
 	public hasCurrentPage() {
 		return !!this.currentPage
+	}
+
+	public getUserDebug() {
+		return this.userDebug
+	}
+
+	public getTraces() {
+		return this.called$Fns
+	}
+
+	@api({
+		description: 'Push debug infos in case of problem',
+		arguments: [[
+			Type.Any({title: 'wyw', description: 'What you want to debug'})
+		]],
+		returns: undefined
+	})
+	public $debug(wyw: any) {
+		this.userDebug.push(wyw)
 	}
 
 	@api({
@@ -435,20 +458,27 @@ export class WebSurfer {
 			}
 
 			let screenshot
+			const traces = cloneDeep(surf.getTraces())
 			if (surf.hasCurrentPage()) {
 				try { screenshot = await surf.$screenshot() } catch (e) { screenshot = (e as Error).message }
 			}
 
 			if (e instanceof Error && (e as any).token && (e as any).position !== undefined) {
-				const jsonataError: {token: string, message: string} = e as any
+				const jsonataError: {token: string, message: string, position: number} = e as any
 
-				throw new WebSurfRuntimeError('$' + jsonataError.token + ' : ' + jsonataError.message, {cause: e, details: {
-					screenshot
+				const line = surfDefinition.expression.substring(0, jsonataError.position).split('\n').length
+
+				throw new WebSurfRuntimeError('$' + jsonataError.token + ', position '+jsonataError.position+' (line '+line+'): ' + jsonataError.message, {cause: e, details: {
+					screenshot,
+					userDebug: surf.getUserDebug(),
+					traces
 				}})
 			}
 
 			throw new WebSurfRuntimeError((e as Error).message, {cause: e, details: {
-				screenshot
+				screenshot,
+				userDebug: surf.getUserDebug(),
+				traces
 			}})
 
 		} finally {

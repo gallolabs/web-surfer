@@ -40,31 +40,33 @@ We will receive a JSON with a description (an extracted text) and a sreenshot ba
     variables: {
         compteur,
         email,
-        _password,
-        start,
-        end
+        _password
     },
     expression: `
+
+        $start := $date().subtract(10, 'days').format('YYYY-MM-DD');
+        $end := $date().format('YYYY-MM-DD');
 
         $startSurfing({'session': {'id': 'grdf', 'ttl': 'P1D'}});
 
         $goTo('https://monespace.grdf.fr/');
 
         $login := function() {(
+            $debug('Login');
             $fill('[name="identifier"]', email, { 'pressEnter': true });
             $fill('[name="credentials.passcode"]', _password, { 'pressEnter': true });
         )};
 
-        $contains($readUrl(), 'connexion.grdf.fr') ? $login() : null;
+        $contains($readUrl(), 'connexion.grdf.fr') ? $login() : $debug('Already logged');
 
         $goTo($buildUrl(
             'https://monespace.grdf.fr/api/e-conso/pce/consommation/informatives?dateDebut={start}&dateFin={end}&pceList%5B%5D={compteur}',
-            $
+            { 'start': $start, 'end': $end, 'compteur': compteur }
         ));
 
-        $resultConso := $readText('body');
+        $resultConso := $eval($readText('body'));
 
-        $eval($resultConso).*.releves.{'date': journeeGaziere, 'kwh': energieConsomme};
+        $resultConso.*.releves.{'date': journeeGaziere, 'kwh': energieConsomme};
     `
 }
 ```
@@ -74,17 +76,14 @@ We explicity create a surfing session with a 1day validity, login to GRDF if nee
 Here an output example :
 ```javascript
 [
-  { date: '2024-11-19', kwh: 13 },
-  { date: '2024-11-20', kwh: 9 },
-  { date: '2024-11-21', kwh: 11 },
-  { date: '2024-11-22', kwh: 16 },
-  { date: '2024-11-23', kwh: 17 },
-  { date: '2024-11-24', kwh: 10 },
-  { date: '2024-11-25', kwh: 10 },
-  { date: '2024-11-26', kwh: 8 },
   { date: '2024-11-27', kwh: 12 },
   { date: '2024-11-28', kwh: 2 },
-  { date: '2024-11-29', kwh: 6 }
+  { date: '2024-11-29', kwh: 6 },
+  { date: '2024-11-30', kwh: 12 },
+  { date: '2024-12-01', kwh: 14 },
+  { date: '2024-12-02', kwh: 10 },
+  { date: '2024-12-03', kwh: 13 },
+  { date: '2024-12-04', kwh: 15 }
 ]
 ```
 

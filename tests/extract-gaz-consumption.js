@@ -4,9 +4,6 @@ const compteur = process.env.COMPTEUR
 const email = process.env.EMAIL
 const _password = process.env.PASSWORD
 
-const start = '2024-11-20'
-const end = '2024-11-30'
-
 const response = await fetch('http://localhost:3000/surf', {
 	method: 'POST',
 	headers: {
@@ -16,31 +13,33 @@ const response = await fetch('http://localhost:3000/surf', {
 		variables: {
 			compteur,
 			email,
-			_password,
-			start,
-			end
+			_password
 		},
 		expression: `
+
+			$start := $date().subtract(10, 'days').format('YYYY-MM-DD');
+			$end := $date().format('YYYY-MM-DD');
 
 			$startSurfing({'session': {'id': 'grdf', 'ttl': 'P1D'}});
 
 			$goTo('https://monespace.grdf.fr/');
 
 			$login := function() {(
+				$debug('Login');
 				$fill('[name="identifier"]', email, { 'pressEnter': true });
 				$fill('[name="credentials.passcode"]', _password, { 'pressEnter': true });
 			)};
 
-			$contains($readUrl(), 'connexion.grdf.fr') ? $login() : null;
+			$contains($readUrl(), 'connexion.grdf.fr') ? $login() : $debug('Already logged');
 
 			$goTo($buildUrl(
 				'https://monespace.grdf.fr/api/e-conso/pce/consommation/informatives?dateDebut={start}&dateFin={end}&pceList%5B%5D={compteur}',
-				$
+				{ 'start': $start, 'end': $end, 'compteur': compteur }
 			));
 
-			$resultConso := $readText('body');
+			$resultConso := $eval($readText('body'));
 
-			$eval($resultConso).*.releves.{'date': journeeGaziere, 'kwh': energieConsomme};
+			$resultConso.*.releves.{'date': journeeGaziere, 'kwh': energieConsomme};
 		`
 	})
 })
