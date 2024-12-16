@@ -71,6 +71,57 @@ We will receive a JSON with a description (an extracted text) and a sreenshot ba
 }
 ```
 
+### Example : Use imports
+
+```javascript
+{
+    variables: {
+        query: 'hello world'
+    },
+    imports: {
+        'google-search': {
+            variables: {
+                url: 'https://www.google.com'
+            },
+            imports: {
+                'google-tools': {
+                    expression: `
+                        {
+                            'readDescription': function() { $readText('[data-attrid=VisualDigestDescription] div:nth-child(2) > span:nth-child(1)') }
+                        }
+                    `
+                }
+            },
+            expression: `
+                function ($query) {(
+                    $tools := $import('google-tools');
+
+                    $goTo(url);
+
+                    $clickOn('button:has-text("Tout accepter")');
+
+                    $fill('textarea[aria-label="Rech."]', $query, { 'pressEnter': true });
+
+                    {
+                        'description': $tools.readDescription(),
+                        'screenshot': $screenshot()
+                    };
+                )}
+            `
+        }
+    },
+    expression: `
+
+        $searchGoogle := $import('google-search', {
+            'url': 'https://www.google.fr'
+        });
+
+        $searchGoogle(query).description;
+
+    `
+}
+```
+
 We explicity create a surfing session with a 1day validity, login to GRDF if needed, fetching consumption and transforming it to obtain exactly what we want.
 
 Here an output example :
@@ -99,6 +150,14 @@ Cases :
 - Output is object/boolean : application/json
 
 When output contains string (text/plain or application/json), binary data will be represented as base64 by default.
+
+## Todo
+
+1) Put here Browserless overrides
+2) Use @gallolabs/application on top
+3) Dockerize
+4) Create Browserless alternative for the need
+5) Dynamic imports: resolve urls ?
 
 ## Help
 

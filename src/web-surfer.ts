@@ -19,6 +19,7 @@ export const webSurferConfigSchema = Type.Object({
 
 export const webSurfDefinitionSchema = Type.Object({
     variables: Type.Optional(Type.Record(Type.String(), Type.Any())),
+    imports: Type.Optional(Type.Record(Type.String(), /* webSurfDefinitionSchema */ Type.Any())),
     expression: Type.String()
 })
 
@@ -120,14 +121,16 @@ class WebSurf {
 	protected writeSessions: Function[] = []
 	protected userDebug: any[] = []
 	protected called$Fns: any[] = []
+	protected imports: Record<string, WebSurfDefinitionSchema>
 
-	constructor(config: WebSurferConfig) {
+	constructor(config: WebSurferConfig, imports?: Record<string, WebSurfDefinitionSchema>) {
 		Object.keys(surfQLApi).forEach(fn => {
 			const methodName = fn
 			// @ts-ignore
 			this[methodName.substring(1)] = this[methodName].bind(this)
 		})
 		this.config = config
+		this.imports = imports || {}
 	}
 
 	public async saveSessions() {
@@ -155,6 +158,31 @@ class WebSurf {
 
 	public getTraces() {
 		return this.called$Fns
+	}
+
+	@api({
+		description: 'Import module',
+		arguments: [[
+			Type.String({title: 'moduleName', description: 'The module name'}),
+			Type.Optional(Type.Object(Type.Any(), {title: 'variables', description: 'The variables'}))
+		]],
+		returns: undefined
+	})
+	public async $import(moduleName: string, variables: Record<string, any> = {}) {
+		const modul = this.imports[moduleName]
+
+		if (!modul) {
+			throw new InvalidWebSurfDefinitionError('Unknown import ' + moduleName)
+		}
+
+		// BAD !!!! TODO KEEP LOCAL
+		this.imports = {...this.imports, ...modul.imports}
+
+		const parsedExpression = jsonata('(' + modul.expression + ')')
+		variables = {...modul.variables, ...variables}
+
+		return await parsedExpression.evaluate(variables, this)
+
 	}
 
 	@api({
@@ -439,7 +467,7 @@ export class WebSurfer {
     public async surf(surfDefinition: WebSurfDefinitionSchema): Promise<WebSurfResult> {
 		const parsedExpression = this.parseExpression(surfDefinition.expression)
 		const variables = surfDefinition.variables || {}
-		const surf = new WebSurf(this.config)
+		const surf = new WebSurf(this.config, surfDefinition.imports)
 
 		try {
 			const v = await parsedExpression.evaluate(variables, surf)
