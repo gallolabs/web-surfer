@@ -1,5 +1,5 @@
 <p align="center">
-    <img height="300" src="https://raw.githubusercontent.com/gallolabs/bobot/main/logo_w300.jpeg">
+    <img height="300" src="https://raw.githubusercontent.com/gallolabs/web-surfer/main/logo_w300.jpeg">
   <h1 align="center">Web Surfer</h1>
 </p>
 
@@ -160,3 +160,5 @@ When output contains string (text/plain or application/json), binary data will b
 ## Help
 
 Go to http://localhost:3000/doc for OpenAPI doc with surfQL available methods.
+
+![The doc preview](doc.png)

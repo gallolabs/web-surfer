@@ -166,7 +166,7 @@ class WebSurf {
 			Type.String({title: 'moduleName', description: 'The module name'}),
 			Type.Optional(Type.Object(Type.Any(), {title: 'variables', description: 'The variables'}))
 		]],
-		returns: undefined
+		returns: Type.Any({description: 'The module (can be function, object, ...)'})
 	})
 	public async $import(moduleName: string, variables: Record<string, any> = {}) {
 		const modul = this.imports[moduleName]
