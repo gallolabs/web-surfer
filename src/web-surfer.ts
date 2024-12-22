@@ -279,7 +279,9 @@ class WebSurf {
 		description: 'Go to URL',
 		arguments: [[
 			Type.String({title: 'url', description: 'The url you want to reach'}),
-			Type.Optional(Type.Object({}, {title: 'options', description: 'options'}))
+			Type.Optional(Type.Object({
+				referer: Type.Optional(Type.String({description: 'The referer'}))
+			}, {title: 'options', description: 'options'}))
 		]],
 		returns: undefined
 	})
