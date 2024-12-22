@@ -3,7 +3,40 @@
   <h1 align="center">Web Surfer</h1>
 </p>
 
-A POC for a scraping tool through API. In development.
+In development.
+
+## Description
+
+Web-Surfer is a webservice to automate (ex scrape) web surfs.
+
+### Launch
+
+`sudo docker compose up`
+
+### Test
+
+You can use the command :
+
+```bash
+npm run build
+node dist/surf-cmd.js --surf-api 'http://localhost:3000' tests/doctolib.yaml --url 'https://www.doctolib.fr/chirurgien-visceral-et-digestif/le-blanc-mesnil/nouredine-oukachbi/booking/availabilities?specialityId=179&telehealth=false&placeId=practice-5105&motiveIds%5B%5D=860154&pid=practice-5105'
+```
+
+This will returns the availabilities for your doctor for the next 15 days :
+```js
+// Launch date 2024-12-22 21:20+01:00
+[
+  '2024-12-24 09:40',
+  '2024-12-24 11:30',
+  '2024-12-26 15:00',
+  '2024-12-26 15:10',
+  '2024-12-26 15:20',
+  '2024-12-26 15:50',
+  '2024-12-26 16:00',
+  '2024-12-26 16:30',
+  '2024-12-26 16:40'
+]
+```
 
 ## POST /surf with SurfQL
 

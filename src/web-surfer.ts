@@ -7,6 +7,7 @@ import { OptionalKind } from '@sinclair/typebox'
 import dayjs, { Dayjs } from 'dayjs'
 import * as duration from 'duration-fns'
 import { cloneDeep } from 'lodash-es'
+import { resolve } from 'path'
 
 const browsersSchema = Type.Union([Type.Literal('firefox'), Type.Literal('chrome'), Type.Literal('chromium'), Type.Literal('webkit')])
 
@@ -14,7 +15,8 @@ type BrowserName = Static<typeof browsersSchema>
 
 export const webSurferConfigSchema = Type.Object({
     defaultBrowser: browsersSchema,
-    browserLaunchers: Type.Record(browsersSchema, Type.String())
+    browserLaunchers: Type.Record(browsersSchema, Type.String()),
+    sessionsDir: Type.String()
 })
 
 export const webSurfDefinitionSchema = Type.Object({
@@ -122,6 +124,7 @@ class WebSurf {
 	protected userDebug: any[] = []
 	protected called$Fns: any[] = []
 	protected imports: Record<string, WebSurfDefinitionSchema>
+	//protected networkWatchs = new WeakMap
 
 	constructor(config: WebSurferConfig, imports?: Record<string, WebSurfDefinitionSchema>) {
 		Object.keys(surfQLApi).forEach(fn => {
@@ -251,8 +254,12 @@ class WebSurf {
 		this.contexts.push(this.currentContext = context)
 	}
 
+	protected getSessionFilePath(id: string) {
+		return resolve(this.config.sessionsDir, id + '.json')
+	}
+
 	protected async writeSession(id: string, ttl: string, content: object) {
-		await writeFile(id + '.json', JSON.stringify({
+		await writeFile(this.getSessionFilePath(id), JSON.stringify({
 			expires: duration.apply(new Date, duration.parse(ttl)).getTime(),
 			content
 		}, null, 2))
@@ -260,7 +267,9 @@ class WebSurf {
 
 	protected async readSession(id: string) {
 		try {
-			const data: {expires: number, content: object} = JSON.parse(await readFile(id + '.json', {encoding: 'utf8'}))
+			const data: {expires: number, content: object} = JSON.parse(
+				await readFile(this.getSessionFilePath(id), {encoding: 'utf8'})
+			)
 
 			if (data.expires <= (new Date).getTime()) {
 				return
@@ -349,6 +358,44 @@ class WebSurf {
 	}
 
 	@api({
+		description: 'Watch network filtering on pattern',
+		arguments: [[
+			Type.String({title: 'pattern', description: 'Pattern to watch'}),
+		]],
+		returns: Type.Array(Type.Object({
+			url: Type.String()
+		}), {description: 'List of watched requests'})
+	})
+	public async $watchNetwork(pattern: string): Promise<Array<any>> {
+		const page = await this.getCurrentPage()
+		const list: any[] = []
+		page.on('requestfinished', (request) => {
+			if (!request.url().includes(pattern)) {
+				return
+			}
+			list.push({
+				url: request.url()
+			})
+			// const list = this.networkWatchs.get(page) || []
+			// list.push(request)
+			// this.networkWatchs.set(page, list)
+		})
+		return list
+	}
+
+	@api({
+		description: 'Check if an element is here',
+		arguments: [[
+			Type.String({title: 'locator', description: 'The element locator'}),
+		]],
+		returns: Type.Boolean({description: 'True if present'})
+	})
+	public async $thereIs(locator: string): Promise<boolean> {
+		const page = await this.getCurrentPage()
+		return await page.locator(locator).count() > 0
+	}
+
+	@api({
 		description: 'Read a text',
 		arguments: [[
 			Type.String({title: 'locator', description: 'The field locator'}),
@@ -358,6 +405,26 @@ class WebSurf {
 	public async $readText(locator: string): Promise<string> {
 		const page = await this.getCurrentPage()
 		return await page.locator(locator).textContent() as string
+	}
+
+	@api({
+		description: 'Modify an URL',
+		arguments: [[
+			Type.String({title: 'url', description: 'The url to modify'}),
+			Type.Object({
+				query: Type.Record(Type.String(), Type.String())
+			}, {title: 'changes', description: 'The changes to apply'})
+		]],
+		returns: Type.String({description: 'The modified url'})
+	})
+	public $modifyUrl(url: string, changes: {query: Record<string, string>}): string {
+		const u = new URL(url)
+
+		for (const qKey in changes.query) {
+			u.searchParams.set(qKey, changes.query[qKey])
+		}
+
+		return u.toString()
 	}
 
 	@api({
