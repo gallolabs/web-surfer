@@ -3,8 +3,6 @@
   <h1 align="center">Web Surfer</h1>
 </p>
 
-In development.
-
 ## Description
 
 Web-Surfer is a webservice to automate (ex scrape) web surfs.

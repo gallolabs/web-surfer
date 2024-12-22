@@ -1,11 +1,11 @@
 {
-  "name": "scraping",
+  "name": "@gallolabs/web-surfer",
   "version": "1.0.0",
   "main": "dist/index.js",
   "type": "module",
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "Automated surf, scrape Enedis, Doctolib, etc",
   "scripts": {
     "build": "rm -Rf dist && tsc",
     "test": "npm run build && node ."
