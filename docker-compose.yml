@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  browserless:
+    build: ./browserless
+    environment:
+      - TIMEOUT=60000
+      - CONCURRENT=10
+      - HOST=0.0.0.0
+      - TOKEN=6R0W53R135510
+      - TZ=Europe/Paris
+      - LANG=fr_FR
+      #- DATA_DIR=/tmp/
+    restart: unless-stopped
+    devices:
+      - /dev/dri:/dev/dri # VAAPI/NVDEC/NVENC render nodes
+  websurfer:
+    build: .
+    restart: unless-stopped
+    init: true
+    ports:
+      - "3000:3000"

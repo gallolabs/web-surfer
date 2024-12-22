@@ -153,9 +153,7 @@ When output contains string (text/plain or application/json), binary data will b
 
 ## Todo
 
-1) Put here Browserless overrides
 2) Use @gallolabs/application on top
-3) Dockerize
 4) Create Browserless alternative for the need
 5) Dynamic imports: resolve urls ?
 
