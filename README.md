@@ -9,7 +9,11 @@ Web-Surfer is a webservice to automate (ex scrape) web surfs.
 
 ### Launch
 
-`sudo docker compose up`
+
+```bash
+npm i
+sudo docker compose up
+```
 
 ### Test
 
@@ -184,6 +188,7 @@ When output contains string (text/plain or application/json), binary data will b
 
 ## Todo
 
+1) Add contracts i/o for modules and why not variables, etc
 2) Use @gallolabs/application on top
 4) Create Browserless alternative for the need
 5) Dynamic imports: resolve urls ?

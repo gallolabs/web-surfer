@@ -8,6 +8,13 @@ import {WebSurfer, webSurfDefinitionSchema, WebSurfRuntimeError, InvalidWebSurfD
 import traverse from 'traverse'
 import { fileTypeFromBuffer } from 'file-type'
 import { OptionalKind } from '@sinclair/typebox'
+import basicAuth from '@fastify/basic-auth'
+
+declare module 'fastify' {
+  interface FastifyRequest {
+    username?: string
+  }
+}
 
 export default async function server(webSurfer: WebSurfer) {
 
@@ -37,6 +44,14 @@ export default async function server(webSurfer: WebSurfer) {
 
     await fastify.register(swagger, {
         openapi: {
+            components: {
+                securitySchemes: {
+                    basicAuth: {
+                        type: 'http',
+                        scheme: 'basic'
+                    }
+                }
+            },
             info: {
                 title: 'Web Surfer',
                 description: `
@@ -97,36 +112,53 @@ ${docApi}       `,
         })
     }
 
-    fastify.post('/surf', {schema:{body: webSurfDefinitionSchema}}, async (request, reply) => {
-        try {
-            const result = await webSurfer.surf(request.body)
+    await fastify.register(basicAuth, { validate: async function validate (username, _, req) {
+        if (!username) {
+            throw new Error('Expected user')
+        }
+        req.username = username
+    }, authenticate: true})
 
-            if (result instanceof Buffer) {
-                reply.type((await fileTypeFromBuffer(result))?.mime || 'application/octet-stream')
-                return result
+    fastify.post(
+        '/surf',
+        {
+            onRequest: fastify.basicAuth,
+            schema: {
+                body: webSurfDefinitionSchema,
+                security: [{basicAuth: []}]
             }
+        },
+        async (request, reply) => {
+            try {
+                const result = await webSurfer.surf(request.body, {
+                    username: request.username!
+                })
 
-            return result instanceof Object ? deepConvertForOutput(result) : result
-        } catch (e) {
-            if (e instanceof InvalidWebSurfDefinitionError) {
-                reply.code(400)
+                if (result instanceof Buffer) {
+                    reply.type((await fileTypeFromBuffer(result))?.mime || 'application/octet-stream')
+                    return result
+                }
 
-                return e
-            }
-            if (!(e instanceof WebSurfRuntimeError)) {
-                throw e
-            }
+                return result instanceof Object ? deepConvertForOutput(result) : result
+            } catch (e) {
+                if (e instanceof InvalidWebSurfDefinitionError) {
+                    reply.code(400)
 
-            reply.code(500)
+                    return e
+                }
+                if (!(e instanceof WebSurfRuntimeError)) {
+                    throw e
+                }
 
-            return {
-                message: e.message,
-                details: deepConvertForOutput(e.details)
+                reply.code(500)
+
+                return {
+                    message: e.message,
+                    details: deepConvertForOutput(e.details)
+                }
             }
         }
-    })
+    )
 
     await fastify.listen({ port: 3000, host: '0.0.0.0' })
-
-
 }

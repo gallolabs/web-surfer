@@ -1,0 +1,4 @@
+expression: |
+  $startSurfing({'session': {'id': 'abc', 'ttl': 'P1M'}});
+  $goTo('https://www.google.fr');
+  $writeInConsole("var val = parseInt(localStorage.getItem('count') || '0') + 1; localStorage.setItem('count', val); val")

@@ -6,8 +6,10 @@ ADD ./ ./
 
 RUN npm run build
 
-USER nobody
+RUN mkdir -p /var/cache/websurfer/sessions && chown nobody /var/cache/websurfer/sessions
 
 VOLUME /var/cache/websurfer/sessions
+
+USER nobody
 
 CMD ["node", "dist/index.js"]

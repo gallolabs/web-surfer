@@ -2,12 +2,10 @@ import { Type, Static } from '@sinclair/typebox'
 import jsonata from 'jsonata'
 import {Ajv} from 'ajv'
 import { Browser, BrowserContext, BrowserType, Page, firefox, webkit, chromium } from 'playwright'
-import { readFile, writeFile } from 'fs/promises'
 import { OptionalKind } from '@sinclair/typebox'
 import dayjs, { Dayjs } from 'dayjs'
-import * as duration from 'duration-fns'
 import { cloneDeep } from 'lodash-es'
-import { resolve } from 'path'
+import SessionsHandler from './sessions.js'
 
 const browsersSchema = Type.Union([Type.Literal('firefox'), Type.Literal('chrome'), Type.Literal('chromium'), Type.Literal('webkit')])
 
@@ -15,8 +13,7 @@ type BrowserName = Static<typeof browsersSchema>
 
 export const webSurferConfigSchema = Type.Object({
     defaultBrowser: browsersSchema,
-    browserLaunchers: Type.Record(browsersSchema, Type.String()),
-    sessionsDir: Type.String()
+    browserLaunchers: Type.Record(browsersSchema, Type.String())
 })
 
 export const webSurfDefinitionSchema = Type.Object({
@@ -27,7 +24,7 @@ export const webSurfDefinitionSchema = Type.Object({
 
 export type WebSurfDefinitionSchema = Static<typeof webSurfDefinitionSchema>
 
-export type WebSurferConfig = Static<typeof webSurferConfigSchema>
+export type WebSurferConfig = Static<typeof webSurferConfigSchema> & {sessionsHandler: SessionsHandler}
 
 export type WebSurfResult = any
 
@@ -124,9 +121,10 @@ class WebSurf {
 	protected userDebug: any[] = []
 	protected called$Fns: any[] = []
 	protected imports: Record<string, WebSurfDefinitionSchema>
+	protected options: {username: string}
 	//protected networkWatchs = new WeakMap
 
-	constructor(config: WebSurferConfig, imports?: Record<string, WebSurfDefinitionSchema>) {
+	constructor(config: WebSurferConfig, options: {username: string}, imports?: Record<string, WebSurfDefinitionSchema>) {
 		Object.keys(surfQLApi).forEach(fn => {
 			const methodName = fn
 			// @ts-ignore
@@ -134,6 +132,7 @@ class WebSurf {
 		})
 		this.config = config
 		this.imports = imports || {}
+		this.options = options
 	}
 
 	public async saveSessions() {
@@ -186,6 +185,18 @@ class WebSurf {
 
 		return await parsedExpression.evaluate(variables, this)
 
+	}
+
+	@api({
+		description: 'Evaluate js code in the console (dev tools)',
+		arguments: [[
+			Type.String({title: 'code', description: 'The code to evaluate'})
+		]],
+		returns: Type.Any({description: 'Any'})
+	})
+	public async $writeInConsole(code: string): Promise<any> {
+		const page = await this.getCurrentPage()
+		return await page.evaluate(code)
 	}
 
 	@api({
@@ -254,34 +265,16 @@ class WebSurf {
 		this.contexts.push(this.currentContext = context)
 	}
 
-	protected getSessionFilePath(id: string) {
-		return resolve(this.config.sessionsDir, id + '.json')
+	protected getSessionFullId(id: string) {
+		return JSON.stringify([this.options.username, id])
 	}
 
 	protected async writeSession(id: string, ttl: string, content: object) {
-		await writeFile(this.getSessionFilePath(id), JSON.stringify({
-			expires: duration.apply(new Date, duration.parse(ttl)).getTime(),
-			content
-		}, null, 2))
+		return this.config.sessionsHandler.writeSession(this.getSessionFullId(id), ttl, content)
 	}
 
 	protected async readSession(id: string) {
-		try {
-			const data: {expires: number, content: object} = JSON.parse(
-				await readFile(this.getSessionFilePath(id), {encoding: 'utf8'})
-			)
-
-			if (data.expires <= (new Date).getTime()) {
-				return
-			}
-
-			return data.content
-		} catch (e) {
-			if ((e as any).code === 'ENOENT') {
-				return
-			}
-			throw e
-		}
+		return this.config.sessionsHandler.readSession(this.getSessionFullId(id))
 	}
 
 	@api({
@@ -533,10 +526,10 @@ export class WebSurfer {
         this.config = config
     }
 
-    public async surf(surfDefinition: WebSurfDefinitionSchema): Promise<WebSurfResult> {
+    public async surf(surfDefinition: WebSurfDefinitionSchema, options: {username: string}): Promise<WebSurfResult> {
 		const parsedExpression = this.parseExpression(surfDefinition.expression)
 		const variables = surfDefinition.variables || {}
-		const surf = new WebSurf(this.config, surfDefinition.imports)
+		const surf = new WebSurf(this.config, options, surfDefinition.imports)
 
 		try {
 			const v = await parsedExpression.evaluate(variables, surf)

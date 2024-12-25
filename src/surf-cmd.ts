@@ -35,6 +35,7 @@ const e = yargs(process.argv)
 		method: 'POST',
 		headers: {
 	      "Content-Type": "application/json",
+	      "Authorization": "Basic Z3Vlc3Q6Z3Vlc3Q="
 	    },
 		body: JSON.stringify({
 			...content,

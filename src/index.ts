@@ -1,5 +1,6 @@
 import {WebSurfer, WebSurferConfig} from './web-surfer.js'
 import server from './http.js'
+import SessionsHandler from './sessions.js'
 
 const config: WebSurferConfig = {
     defaultBrowser: 'firefox',
@@ -9,7 +10,7 @@ const config: WebSurferConfig = {
         chromium: 'ws://browserless:3000/chromium/playwright?token=6R0W53R135510&launch={options}',
         webkit: 'ws://browserless:3000/webkit/playwright?token=6R0W53R135510&launch={options}',
     },
-    sessionsDir: '/var/cache/websurfer/sessions'
+    sessionsHandler: new SessionsHandler({sessionsDir: '/var/cache/websurfer/sessions'})
 }
 
 const webSurfer = new WebSurfer(config)
