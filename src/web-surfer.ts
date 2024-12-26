@@ -4,8 +4,9 @@ import {Ajv} from 'ajv'
 import { Browser, BrowserContext, BrowserType, Page, firefox, webkit, chromium } from 'playwright'
 import { OptionalKind } from '@sinclair/typebox'
 import dayjs, { Dayjs } from 'dayjs'
-import { cloneDeep } from 'lodash-es'
+import { cloneDeep, map } from 'lodash-es'
 import SessionsHandler from './sessions.js'
+import got from 'got'
 
 const browsersSchema = Type.Union([Type.Literal('firefox'), Type.Literal('chrome'), Type.Literal('chromium'), Type.Literal('webkit')])
 
@@ -530,9 +531,21 @@ export class WebSurfer {
     public async surf(surfDefinition: WebSurfDefinitionSchema, options: {username: string}): Promise<WebSurfResult> {
         const parsedExpression = this.parseExpression(surfDefinition.expression)
         const variables = surfDefinition.variables || {}
-        const surf = new WebSurf(this.config, options, surfDefinition.imports)
+        const imports = surfDefinition.imports || {}
+        let surf: WebSurf | undefined = undefined
 
         try {
+            await Promise.all(map(imports, async (definitionOrLink: WebSurfDefinitionSchema | string, name: string) => {
+                if (typeof definitionOrLink === 'string') {
+                    try {
+                        imports[name] = await got(definitionOrLink).json()
+                    } catch (e) {
+                        throw new Error('Unable to load import ' + name + ' : ' + (e as Error).message, {cause: e})
+                    }
+                }
+            }))
+
+            surf = new WebSurf(this.config, options, imports)
             const v = await parsedExpression.evaluate(variables, surf)
             await surf.saveSessions().catch(e => console.error(e))
             return v
@@ -549,8 +562,8 @@ export class WebSurfer {
             }
 
             let screenshot
-            const traces = cloneDeep(surf.getTraces())
-            if (surf.hasCurrentPage()) {
+            const traces = cloneDeep(surf?.getTraces())
+            if (surf?.hasCurrentPage()) {
                 try { screenshot = await surf.$screenshot() } catch (e) { screenshot = (e as Error).message }
             }
 
@@ -561,19 +574,19 @@ export class WebSurfer {
 
                 throw new WebSurfRuntimeError('$' + jsonataError.token + ', position '+jsonataError.position+' (line '+line+'): ' + jsonataError.message, {cause: e, details: {
                     screenshot,
-                    userDebug: surf.getUserDebug(),
+                    userDebug: surf?.getUserDebug(),
                     traces
                 }})
             }
 
             throw new WebSurfRuntimeError((e as Error).message, {cause: e, details: {
                 screenshot,
-                userDebug: surf.getUserDebug(),
+                userDebug: surf?.getUserDebug(),
                 traces
             }})
 
         } finally {
-            surf.destroy().catch(console.error)
+            surf?.destroy().catch(console.error)
         }
     }
 

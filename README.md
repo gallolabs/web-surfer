@@ -119,27 +119,19 @@ We will receive a JSON with a description (an extracted text) and a sreenshot ba
                 url: 'https://www.google.com'
             },
             imports: {
-                'google-tools': {
-                    expression: `
-                        {
-                            'readDescription': function() { $readText('[data-attrid=VisualDigestDescription] div:nth-child(2) > span:nth-child(1)') }
-                        }
-                    `
-                }
+                'google-tools': 'http://www.my-trusted-content.com/google-tools.json'
             },
             expression: `
                 function ($query) {(
                     $tools := $import('google-tools');
 
                     $goTo(url);
-
-                    $clickOn('button:has-text("Tout accepter")');
-
-                    $fill('textarea[aria-label="Rech."]', $query, { 'pressEnter': true });
+                    $tools.acceptPopinSpam();
+                    $tools.fillSearch($query);
 
                     {
-                        'description': $tools.readDescription(),
-                        'screenshot': $screenshot()
+                      'description': $tools.readDescription(),
+                      'screenshot': $screenshot()
                     };
                 )}
             `
@@ -191,7 +183,6 @@ When output contains string (text/plain or application/json), binary data will b
 1) Add contracts i/o for modules and why not variables, etc
 2) Use @gallolabs/application on top
 4) Create Browserless alternative for the need
-5) Dynamic imports: resolve urls ?
 
 ## Help
 

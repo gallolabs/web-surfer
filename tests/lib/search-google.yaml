@@ -1,0 +1,24 @@
+variables:
+  url: 'https://www.google.com'
+imports:
+  google-tools:
+    expression: |
+      {
+        'readDescription': function() { $readText('[data-attrid=VisualDigestDescription] div:nth-child(2) > span:nth-child(1)') },
+        'acceptPopinSpam': function() { $clickOn('button:has-text("Tout accepter")') },
+        'fillSearch': function($query) { $fill('textarea[aria-label="Rech."]', $query, { 'pressEnter': true }) }
+      }
+
+expression: |
+  function ($query) {(
+    $tools := $import('google-tools');
+
+    $goTo(url);
+    $tools.acceptPopinSpam();
+    $tools.fillSearch($query);
+
+    {
+      'description': $tools.readDescription(),
+      'screenshot': $screenshot()
+    };
+  )}
