@@ -20,7 +20,9 @@ sudo docker compose up
 You can use the command :
 
 ```bash
-npm run build
+# Pre-requise : Running service (ex npm start)
+npm run build # Build surf-cmd
+npm run serve-lib # Start a server to serve libs (for imports tests)
 node dist/surf-cmd.js --surf-api 'http://localhost:3000' tests/doctolib.yaml --url 'https://www.doctolib.fr/chirurgien-visceral-et-digestif/le-blanc-mesnil/nouredine-oukachbi/booking/availabilities?specialityId=179&telehealth=false&placeId=practice-5105&motiveIds%5B%5D=860154&pid=practice-5105'
 ```
 
