@@ -1,0 +1,35 @@
+variables:
+  query: 'hello world'
+
+imports:
+  google-search:
+    variables:
+      url: 'https://www.google.com'
+    imports:
+      google-tools:
+        expression: |
+          {
+            'readDescription': function() { $readText('[data-attrid=VisualDigestDescription] div:nth-child(2) > span:nth-child(1)') }
+          }
+    expression: |
+      function ($query) {(
+        $tools := $import('google-tools');
+
+        $goTo(url);
+
+        $clickOn('button:has-text("Tout accepter")');
+
+        $fill('textarea[aria-label="Rech."]', $query, { 'pressEnter': true });
+
+        {
+          'description': $tools.readDescription(),
+          'screenshot': $screenshot()
+        };
+      )}
+
+expression: |
+  $searchGoogle := $import('google-search', {
+    'url': 'https://www.google.fr'
+  });
+
+  $searchGoogle(query).description;

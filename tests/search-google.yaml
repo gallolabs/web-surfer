@@ -1,0 +1,11 @@
+expression: |
+  $goTo('https://www.google.fr');
+
+  $clickOn('button:has-text("Tout accepter")');
+
+  $fill('textarea[aria-label="Rech."]', 'Trump', { 'pressEnter': true });
+
+  {
+    'description': $readText('[data-attrid=description] div > span:nth-child(2)'),
+    'screenshot': $screenshot()
+  };

@@ -250,6 +250,7 @@ class WebSurf {
             }
         })
 
+		context.setDefaultNavigationTimeout(20000)
         context.setDefaultTimeout(10000)
 
         await context.addInitScript(() => {

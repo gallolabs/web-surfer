@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 import yargs from 'yargs'
-// @ts-ignore
-import cliMd from 'cli-markdown'
-import { createWriteStream, readFileSync } from 'fs'
+import { createWriteStream, readFileSync, writeFileSync } from 'fs'
 import * as yaml from 'yaml'
 import { Readable } from 'stream'
+import traverse from 'traverse'
+import { fileTypeFromBuffer } from 'file-type'
+import { pipeline } from 'stream/promises'
 
 const e = yargs(process.argv)
 .command('$0 <z> <y> <surf-file>', 'Surf', {
@@ -13,19 +14,7 @@ const e = yargs(process.argv)
 		type: 'string',
 		default: 'http://localhost:3000'
 	},
-	man: {
-		describe: 'Show doc',
-		type: 'boolean'
-	}
 }, async ({man, surfApi, surfFile, ...others}) => {
-
-	if (man) {
-		const fullDoc: any = await (await fetch(surfApi + '/doc/json')).json()
-
-		process.stdout.write(cliMd(fullDoc.info.description))
-
-		return
-	}
 
 	const fileContent = readFileSync(surfFile as string, {encoding: 'utf8'})
 
@@ -50,21 +39,49 @@ const e = yargs(process.argv)
 		if (!response.headers.get('content-type')?.startsWith('application/json') && !response.headers.get('content-type')?.startsWith('text/plain')) {
 			if (response.body) {
 				// @ts-ignore
-				Readable.fromWeb(response.body).pipe(createWriteStream('response.png'))
+				await pipeline(Readable.fromWeb(response.body), createWriteStream('response.png'))
 				console.log('see response.png')
 				return
 			}
 		}
 
-		const r = await response.json()
+		const r = await deepConvert(response.headers.get('content-type')?.startsWith('text/plain') ? await response.text() : await response.json())
 
 		console.log(r)
 	} else {
-		const r = await response.text()
+		const r = await deepConvert(response.headers.get('content-type')?.startsWith('text/plain') ? await response.text() : await response.json())
+
 		console.error(r)
-		e.exit(1, new Error(r))
+		e.exit(1, new Error(r.toString()))
 	}
 
 })
+
+async function deepConvert (r: any): Promise<any> {
+	if (r instanceof Object) {
+		const promises: Promise<any>[] = []
+
+		traverse(r).forEach(function (v) {
+			if (typeof v === 'string' && v.length > 1000) {
+				const content = Buffer.from(v, 'base64')
+
+				promises.push(fileTypeFromBuffer(content).then(result => {
+					if (!result) {
+						return
+					}
+
+					const filename = this.key + '.png'
+					writeFileSync(filename, content)
+					this.update('see ' + filename)
+
+				}))
+			}
+		})
+
+		await Promise.all(promises)
+	}
+
+	return r
+}
 
 e.parse()

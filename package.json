@@ -7,8 +7,7 @@
   "license": "ISC",
   "description": "Automated surf, scrape Enedis, Doctolib, etc",
   "scripts": {
-    "build": "rm -Rf dist && tsc",
-    "test": "npm run build && node ."
+    "build": "rm -Rf dist && tsc"
   },
   "dependencies": {
     "@fastify/basic-auth": "^6.0.2",
@@ -17,7 +16,6 @@
     "@fastify/type-provider-typebox": "^5.1.0",
     "@sinclair/typebox": "^0.34.11",
     "ajv": "^8.17.1",
-    "cli-markdown": "^3.4.0",
     "dayjs": "^1.11.13",
     "duration-fns": "^3.0.2",
     "fastify": "^5.0.0",
