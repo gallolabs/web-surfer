@@ -125,7 +125,7 @@ We will receive a JSON with a description (an extracted text) and a sreenshot ba
             },
             expression: `
                 function ($query) {(
-                    $tools := $import('google-tools');
+                    $tools := $call('google-tools');
 
                     $goTo(url);
                     $tools.acceptPopinSpam();
@@ -141,7 +141,7 @@ We will receive a JSON with a description (an extracted text) and a sreenshot ba
     },
     expression: `
 
-        $searchGoogle := $import('google-search', {
+        $searchGoogle := $call('google-search', {
             'url': 'https://www.google.fr'
         });
 
@@ -182,6 +182,7 @@ When output contains string (text/plain or application/json), binary data will b
 
 ## Todo
 
+1) Resolve import on $call call instead of init
 1) Add contracts i/o for modules and why not variables, etc
 2) Use @gallolabs/application on top
 4) Create Browserless alternative for the need

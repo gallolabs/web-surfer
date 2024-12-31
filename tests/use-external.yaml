@@ -5,7 +5,7 @@ imports:
   google-search: 'http://172.17.0.1:3001/search-google'
 
 expression: |
-  $searchGoogle := $import('google-search', {
+  $searchGoogle := $call('google-search', {
     'url': 'https://www.google.fr'
   });
 
