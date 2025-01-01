@@ -198,6 +198,21 @@ Our surf :
 
 Tadaaaa ! We can reuse code. It is also possible to export functions, but the logic of input/expression/output is recommanded.
 
+## startSurfing
+
+High functions will use the last found resources of the surf. If not found, they will be created. To explicit them, you can declare your surfing. For example (everything is optionnal) :
+```
+$startSurfing({
+    'browser': 'firefox',
+    'session': {'id': 'abc', 'ttl': 'P1M'},
+    'i18nPreset': 'ES'
+});
+ ```
+
+ i18nPreset allows to give a preset (alias) of a set of internationalization params, including timezone, locale, proxy, etc.
+
+ StartSurfing can be called several times in the same surf. A Surfing context is created (and pages will be created then).
+
 ## Notes
 
 SurfQL is on top of JSONATA (input -> transformation -> output). Browsers are managed by Browserless (warning to the licence), but it should be good to have an opensource alternative with minimum firefox and chrome and autostart and garbage system, drived by playwright.
@@ -213,7 +228,7 @@ When output contains string (text/plain or application/json), binary data will b
 
 ## Todo
 
-- Resolve import on $call call instead of init
+- Resolve import on $call call instead of init, with ability to refer to the same "document"
 - Add URI sha1 check to ensure a resource has not changed ? Or another way to manage contracts/trust ?
 - Add contracts zod for inputs/output, etc
 - Use @gallolabs/application on top
