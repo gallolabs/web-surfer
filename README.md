@@ -9,7 +9,6 @@ Web-Surfer is a webservice to automate (ex scrape) web surfs.
 
 ### Launch
 
-
 ```bash
 npm i
 sudo docker compose up
@@ -108,49 +107,6 @@ We will receive a JSON with a description (an extracted text) and a sreenshot ba
 }
 ```
 
-### Example : Use imports
-
-```javascript
-{
-    input: {
-        query: 'hello world'
-    },
-    imports: {
-        'google-search': {
-            input: {
-                url: 'https://www.google.com'
-            },
-            imports: {
-                'google-tools': 'http://www.my-trusted-content.com/google-tools.json'
-            },
-            expression: `
-                function ($query) {(
-                    $tools := $call('google-tools');
-
-                    $goTo(url);
-                    $tools.acceptPopinSpam();
-                    $tools.fillSearch($query);
-
-                    {
-                      'description': $tools.readDescription(),
-                      'screenshot': $screenshot()
-                    };
-                )}
-            `
-        }
-    },
-    expression: `
-
-        $searchGoogle := $call('google-search', {
-            'url': 'https://www.google.fr'
-        });
-
-        $searchGoogle(query).description;
-
-    `
-}
-```
-
 We explicity create a surfing session with a 1day validity, login to GRDF if needed, fetching consumption and transforming it to obtain exactly what we want.
 
 Here an output example :
@@ -167,9 +123,84 @@ Here an output example :
 ]
 ```
 
+### Example : Use imports
+
+http://trusted.com/shared-surfs.json
+
+```javascript
+{
+    search: {
+        schemas: {
+            input: {
+                type: 'object',
+                properties: {
+                    url: {
+                        type: 'string'
+                    },
+                    query: {
+                        type: 'string'
+                    }
+                },
+                required: [
+                    'url',
+                    'query'
+                ]
+            },
+            output: {
+                type: 'object',
+                properties: {
+                    description: {
+                        type: 'string'
+                    },
+                    screenshot: {
+                        type: 'object'
+                    }
+                },
+                required: [
+                    'description',
+                    'screenshot'
+                ]
+            }
+        },
+        input: {
+            url: 'https://www.google.com'
+        },
+        expression: `
+            $goTo(url);
+            $clickOn('button:has-text("Tout accepter")');
+            $fill('textarea[aria-label="Rech."]', query, { 'pressEnter': true });
+
+            {
+              'description': $readText('[data-attrid=VisualDigestDescription] div:nth-child(2) > span:nth-child(1)'),
+              'screenshot': $screenshot()
+            }
+
+        `
+    }
+}
+```
+
+Our surf :
+
+```javascript
+{
+    input: 'hello world',
+    expression: `
+
+        $call('http://trusted.com/shared-surfs.json#/search', {
+            'url': 'https://www.google.fr',
+            'query': $
+        }).description
+
+    `
+}
+```
+
+Tadaaaa ! We can reuse code. It is also possible to export functions, but the logic of input/expression/output is recommanded.
+
 ## Notes
 
-SurfQL is on top of JSONATA. Browsers are managed by Browserless, but it should be good to have an opensource alternative with minimum firefox and chrome and autostart and garbage system, drived by playwright.
+SurfQL is on top of JSONATA (input -> transformation -> output). Browsers are managed by Browserless (warning to the licence), but it should be good to have an opensource alternative with minimum firefox and chrome and autostart and garbage system, drived by playwright.
 
 For output, Web Surfer will choose the content type (json/plain/image/etc) depending of the returned value. To force the type, use Accept http header. To force binary encoding (in case of json for example), use explicit method (ex $base64) (or header ?)
 
@@ -182,10 +213,12 @@ When output contains string (text/plain or application/json), binary data will b
 
 ## Todo
 
-1) Resolve import on $call call instead of init
-1) Add contracts for inputs/output, etc
-2) Use @gallolabs/application on top
-4) Create Browserless alternative for the need
+- Resolve import on $call call instead of init
+- Add URI sha1 check to ensure a resource has not changed ? Or another way to manage contracts/trust ?
+- Add contracts zod for inputs/output, etc
+- Use @gallolabs/application on top
+- Create Browserless alternative for the need
+
 
 ## Help
 

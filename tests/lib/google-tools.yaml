@@ -1,0 +1,35 @@
+search:
+  schemas:
+    input:
+      type: object
+      properties:
+        url:
+          type: string
+        query:
+          type: string
+      required:
+        - url
+        - query
+    output:
+      type: object
+      properties:
+        description:
+          type: string
+        screenshot:
+          type: object
+      required:
+        - description
+        - screenshot
+
+  input:
+    url: https://www.google.com
+
+  expression: |
+    $goTo(url);
+    $clickOn('button:has-text("Tout accepter")');
+    $fill('textarea[aria-label="Rech."]', query, { 'pressEnter': true });
+
+    {
+      'description': $readText('[data-attrid=VisualDigestDescription] div:nth-child(2) > span:nth-child(1)'),
+      'screenshot': $screenshot()
+    };

@@ -28,10 +28,10 @@ const e = yargs(process.argv)
         },
         body: JSON.stringify({
             ...content,
-            variables: {
-                ...content.variables,
+            input: content.input || others ? {
+                ...content.input,
                 ...others
-            }
+            } : undefined
         })
     })
 

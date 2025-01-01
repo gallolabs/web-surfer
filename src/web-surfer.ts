@@ -18,9 +18,13 @@ export const webSurferConfigSchema = Type.Object({
 })
 
 export const webSurfDefinitionSchema = Type.Object({
-    input: Type.Optional(Type.Record(Type.String(), Type.Any())),
+    input: Type.Optional(Type.Any()),
     imports: Type.Optional(Type.Record(Type.String(), /* webSurfDefinitionSchema */ Type.Any())),
-    expression: Type.String()
+    expression: Type.String(),
+    schemas: Type.Optional(Type.Object({
+        input: Type.Optional(Type.Any()),
+        output: Type.Optional(Type.Any())
+    }))
 })
 
 export type WebSurfDefinitionSchema = Static<typeof webSurfDefinitionSchema>
@@ -167,25 +171,44 @@ class WebSurf {
         description: 'Call another surfQL',
         arguments: [[
             Type.String({title: 'ref', description: 'The surfQL ref'}),
-            Type.Optional(Type.Object(Type.Any(), {title: 'input', description: 'The input'}))
+            Type.Optional(Type.Any({title: 'input', description: 'The input'}))
         ]],
         returns: Type.Any({description: 'The ref result (can be function, object, ...)'})
     })
-    public async $call(moduleName: string, input: Record<string, any> = {}) {
+    public async $call(moduleName: string, input?: any) {
         const modul = this.imports[moduleName]
 
         if (!modul) {
-            throw new InvalidWebSurfDefinitionError('Unknown import ' + moduleName)
+            throw new InvalidWebSurfDefinitionError('Unknown ref ' + moduleName)
         }
 
         // BAD !!!! TODO KEEP LOCAL
         this.imports = {...this.imports, ...modul.imports}
 
         const parsedExpression = jsonata('(' + modul.expression + ')')
-        input = {...modul.input, ...input}
+        input = modul.input instanceof Object && input instanceof Object ? {...modul.input, ...input} : input
 
-        return await parsedExpression.evaluate(input, this)
+        if (modul.schemas?.input) {
+            const validate = (new Ajv).compile(modul.schemas.input)
 
+            if (!validate(input)) {
+                throw new WebSurfRuntimeError('Invalid input', {details: validate.errors})
+            }
+
+        }
+
+        const output = await parsedExpression.evaluate(input, this)
+
+        if (modul.schemas?.output) {
+            const validate = (new Ajv).compile(modul.schemas.output)
+
+            if (!validate(output)) {
+                throw new WebSurfRuntimeError('Invalid output', {details: validate.errors})
+            }
+
+        }
+
+        return output
     }
 
     @api({
@@ -530,15 +553,30 @@ export class WebSurfer {
 
     public async surf(surfDefinition: WebSurfDefinitionSchema, options: {username: string}): Promise<WebSurfResult> {
         const parsedExpression = this.parseExpression(surfDefinition.expression)
-        const input = surfDefinition.input || {}
+        const input = surfDefinition.input
         const imports = surfDefinition.imports || {}
         let surf: WebSurf | undefined = undefined
 
         try {
+
+            if (surfDefinition.schemas?.input) {
+                const validate = (new Ajv).compile(surfDefinition.schemas.input)
+
+                if (!validate(input)) {
+                    throw new WebSurfRuntimeError('Invalid input', {details: validate.errors})
+                }
+
+            }
+
             await Promise.all(map(imports, async (definitionOrLink: WebSurfDefinitionSchema | string, name: string) => {
                 if (typeof definitionOrLink === 'string') {
                     try {
-                        imports[name] = await got(definitionOrLink).json()
+                        const [url, frag] = definitionOrLink.split('#')
+                        imports[name] = await got(url).json()
+                        if (frag) {
+                            imports[name] = imports[name][frag.substring(1)]
+
+                        }
                     } catch (e) {
                         throw new Error('Unable to load import ' + name + ' : ' + (e as Error).message, {cause: e})
                     }
@@ -548,6 +586,16 @@ export class WebSurfer {
             surf = new WebSurf(this.config, options, imports)
             const v = await parsedExpression.evaluate(input, surf)
             await surf.saveSessions().catch(e => console.error(e))
+
+            if (surfDefinition.schemas?.output) {
+                const validate = (new Ajv).compile(surfDefinition.schemas.output)
+
+                if (!validate(v)) {
+                    throw new WebSurfRuntimeError('Invalid output', {details: validate.errors})
+                }
+
+            }
+
             return v
         } catch (e) {
                             console.log(e)
@@ -580,6 +628,7 @@ export class WebSurfer {
             }
 
             throw new WebSurfRuntimeError((e as Error).message, {cause: e, details: {
+                cause: e instanceof WebSurfRuntimeError && e,
                 screenshot,
                 userDebug: surf?.getUserDebug(),
                 traces

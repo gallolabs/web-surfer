@@ -1,0 +1,22 @@
+input: 'hello world'
+
+imports:
+  http://172.17.0.1:3001/google-tools#/search: http://172.17.0.1:3001/google-tools#/search
+
+expression: |
+  $call('http://172.17.0.1:3001/google-tools#/search', {
+    'url': 'https://www.google.fr',
+    'query': $
+  }).description
+
+schemas:
+  input:
+    type: string
+  output:
+    type: string
+
+# inputSchema: |
+#   $z.string()
+
+# outputSchema: |
+#   $z.string()
