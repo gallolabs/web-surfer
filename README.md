@@ -9,7 +9,7 @@ Web-Surfer is a webservice to automate (ex scrape) web surfs.
 
 ### Launch
 
-```bash
+```sh
 npm i
 sudo docker compose up
 ```
@@ -18,7 +18,7 @@ sudo docker compose up
 
 You can use the command :
 
-```bash
+```sh
 # Pre-requise : Running service (ex npm start)
 npm run build # Build surf-cmd
 npm run serve-lib # Start a server to serve libs (for imports tests)
@@ -26,7 +26,7 @@ node dist/surf-cmd.js --surf-api 'http://localhost:3000' tests/doctolib.yaml --u
 ```
 
 This will returns the availabilities for your doctor for the next 15 days :
-```js
+```javascript
 // Launch date 2024-12-22 21:20+01:00
 [
   '2024-12-24 09:40',
