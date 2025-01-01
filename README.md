@@ -74,7 +74,7 @@ We will receive a JSON with a description (an extracted text) and a sreenshot ba
 
 ```javascript
 {
-    variables: {
+    input: {
         compteur,
         email,
         _password
@@ -112,12 +112,12 @@ We will receive a JSON with a description (an extracted text) and a sreenshot ba
 
 ```javascript
 {
-    variables: {
+    input: {
         query: 'hello world'
     },
     imports: {
         'google-search': {
-            variables: {
+            input: {
                 url: 'https://www.google.com'
             },
             imports: {
@@ -183,7 +183,7 @@ When output contains string (text/plain or application/json), binary data will b
 ## Todo
 
 1) Resolve import on $call call instead of init
-1) Add contracts i/o for modules and why not variables, etc
+1) Add contracts for inputs/output, etc
 2) Use @gallolabs/application on top
 4) Create Browserless alternative for the need
 

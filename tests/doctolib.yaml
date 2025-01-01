@@ -1,5 +1,6 @@
-variables:
+input:
   url: https://www.doctolib.fr/echographiste/lyon/mylene-couillerot/booking/availabilities?specialityId=50&telehealth=false&placeId=practice-50729&motiveIds%5B%5D=777785
+
 expression: |
   $requests := $watchNetwork('availabilities.json');
 

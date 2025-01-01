@@ -18,7 +18,7 @@ export const webSurferConfigSchema = Type.Object({
 })
 
 export const webSurfDefinitionSchema = Type.Object({
-    variables: Type.Optional(Type.Record(Type.String(), Type.Any())),
+    input: Type.Optional(Type.Record(Type.String(), Type.Any())),
     imports: Type.Optional(Type.Record(Type.String(), /* webSurfDefinitionSchema */ Type.Any())),
     expression: Type.String()
 })
@@ -167,11 +167,11 @@ class WebSurf {
         description: 'Call another surfQL',
         arguments: [[
             Type.String({title: 'ref', description: 'The surfQL ref'}),
-            Type.Optional(Type.Object(Type.Any(), {title: 'variables', description: 'The variables'}))
+            Type.Optional(Type.Object(Type.Any(), {title: 'input', description: 'The input'}))
         ]],
         returns: Type.Any({description: 'The ref result (can be function, object, ...)'})
     })
-    public async $call(moduleName: string, variables: Record<string, any> = {}) {
+    public async $call(moduleName: string, input: Record<string, any> = {}) {
         const modul = this.imports[moduleName]
 
         if (!modul) {
@@ -182,9 +182,9 @@ class WebSurf {
         this.imports = {...this.imports, ...modul.imports}
 
         const parsedExpression = jsonata('(' + modul.expression + ')')
-        variables = {...modul.variables, ...variables}
+        input = {...modul.input, ...input}
 
-        return await parsedExpression.evaluate(variables, this)
+        return await parsedExpression.evaluate(input, this)
 
     }
 
@@ -530,7 +530,7 @@ export class WebSurfer {
 
     public async surf(surfDefinition: WebSurfDefinitionSchema, options: {username: string}): Promise<WebSurfResult> {
         const parsedExpression = this.parseExpression(surfDefinition.expression)
-        const variables = surfDefinition.variables || {}
+        const input = surfDefinition.input || {}
         const imports = surfDefinition.imports || {}
         let surf: WebSurf | undefined = undefined
 
@@ -546,7 +546,7 @@ export class WebSurfer {
             }))
 
             surf = new WebSurf(this.config, options, imports)
-            const v = await parsedExpression.evaluate(variables, surf)
+            const v = await parsedExpression.evaluate(input, surf)
             await surf.saveSessions().catch(e => console.error(e))
             return v
         } catch (e) {
