@@ -234,6 +234,7 @@ When output contains string (text/plain or application/json), binary data will b
 - Add contracts zod for inputs/output, etc
 - Use @gallolabs/application on top
 - Create Browserless alternative for the need
+- Replace Typebox by Zod ?
 
 
 ## Help

@@ -9,4 +9,7 @@ expression: |
     'url': 'https://www.google.fr'
   });
 
-  $searchGoogle(query).description;
+  $ensure(
+    $searchGoogle(query).description,
+    { 'type': 'string' }
+  )

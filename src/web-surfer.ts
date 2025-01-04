@@ -147,6 +147,35 @@ class WebSurf {
     }
 
     @api({
+        description: 'Ensures something is valid',
+        arguments: [[
+            Type.Any({title: 'something', description: 'To ensure'}),
+            Type.Any({title: 'validation', description: 'The validation (JSON-schema) and maybe in the futur a zod'}),
+        ]],
+        returns: Type.Any({description: 'The something'})
+    })
+    public async $ensure(something: any, toMatch: any) {
+        const validate = (new Ajv).compile(toMatch)
+
+        if (!validate(something)) {
+            throw new WebSurfRuntimeError('$ensure not passed', {details: validate.errors})
+        }
+
+        return something
+    }
+
+    @api({
+        description: 'Just ... Fail',
+        arguments: [[
+            Type.String({title: 'reason', description: 'Reason to fail'}),
+        ]],
+        returns: undefined
+    })
+    public $fail(reason: string) {
+        throw new WebSurfRuntimeError('$fail : ' + reason, {details: null})
+    }
+
+    @api({
         description: 'Call another surfQL',
         arguments: [[
             Type.String({title: 'ref', description: 'The surfQL ref'}),
