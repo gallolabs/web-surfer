@@ -205,7 +205,8 @@ High functions will use the last found resources of the surf. If not found, they
 $startSurfing({
     'browser': 'firefox',
     'session': {'id': 'abc', 'ttl': 'P1M'},
-    'i18nPreset': 'ES'
+    'timezone': 'Europe/Madrid',
+    'locale': 'es_ES'
 });
  ```
 

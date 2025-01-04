@@ -3,7 +3,11 @@ import server from './http.js'
 import SessionsHandler from './sessions.js'
 
 const config: WebSurferConfig = {
-    defaultBrowser: 'firefox',
+    defaults: {
+        browser: 'firefox',
+        timezone: 'Europe/Paris',
+        locale: 'fr_FR'
+    },
     browserLaunchers: {
         firefox: 'ws://browserless:3000/firefox/playwright?token=6R0W53R135510&launch={options}',
         chrome: 'ws://browserless:3000/chrome/playwright?token=6R0W53R135510&launch={options}',

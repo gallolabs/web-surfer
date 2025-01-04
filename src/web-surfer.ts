@@ -13,8 +13,12 @@ const browsersSchema = Type.Union([Type.Literal('firefox'), Type.Literal('chrome
 type BrowserName = Static<typeof browsersSchema>
 
 export const webSurferConfigSchema = Type.Object({
-    defaultBrowser: browsersSchema,
-    browserLaunchers: Type.Record(browsersSchema, Type.String())
+    defaults: Type.Optional(Type.Object({
+        browser: Type.Optional(browsersSchema),
+        timezone: Type.Optional(Type.String()),
+        locale: Type.Optional(Type.String())
+    })),
+    browserLaunchers: Type.Partial(Type.Record(browsersSchema, Type.String()))
 })
 
 export const webSurfDefinitionSchema = Type.Object({
@@ -88,31 +92,6 @@ function api(desc: SurfQLApiItem): Method {
             throw new InvalidWebSurfDefinitionError(fnName + ' : invalids arguments ' + JSON.stringify(lastErrors))
         };
     };
-}
-
-const defaultI18nPreset = 'FR'
-
-const i18nMap: Record<string, {
-    proxies: Array<{server: string, healthy: boolean | undefined}>,
-    locale: string,
-    timezoneId: string
-    geolocation: any
-}> = {
-    FR: {
-        proxies: [],
-        locale: 'fr_FR',
-        timezoneId: 'Europe/Paris',
-        geolocation: {latitude: 48.8631899, longitude: 2.3556759}
-    },
-    ES: {
-        proxies: [{
-            server: 'http://195.114.209.50:80',
-            healthy: undefined
-        }],
-        locale: 'es_ES',
-        timezoneId: 'Europe/Madrid',
-        geolocation: {latitude: 40.4380986, longitude: -3.8443431}
-    }
 }
 
 class WebSurf {
@@ -243,35 +222,39 @@ class WebSurf {
                     id: Type.String(),
                     ttl: Type.String({pattern: '^P[A-Z0-9]{2,}$'})
                 }, {description: 'The surf session'})),
-                i18nPreset: Type.Optional(Type.String({description: 'The preset for i18n (timezone, locale, geoloc)'}))
+                timezone: Type.Optional(Type.String({description: 'The timezone'})),
+                locale: Type.Optional(Type.String({description: 'The locale'})),
+                geolocation: Type.Optional(Type.Any()),
+                proxy: Type.Optional(Type.Any())
             }, {title: 'options', description: 'Surf options'}))
         ]],
         returns: undefined
     })
     public async $startSurfing(
-        {browser: browserName, session, i18nPreset: i18nPresetName}:
-        {browser?: BrowserName, session?: { id: string, ttl: string}, i18nPreset?: string} = {}
+        {browser: browserName, session, proxy, timezone, locale, geolocation}:
+        {
+            browser?: BrowserName,
+            session?: { id: string, ttl: string},
+            proxy?: any,
+            timezone?: string,
+            locale?: string,
+            geolocation?: any
+        } = {}
     ) {
         const browser = await this.getBrowser(browserName)
         this.currentBrowser = browser
 
         const sessionContent = session ? await this.readSession(session.id) : undefined
 
-        const i18nPreset = i18nMap[i18nPresetName || defaultI18nPreset]
-
-        if (!i18nPreset) {
-            throw new InvalidWebSurfDefinitionError('Unknwon i18n preset')
-        }
-
         const context = await browser.newContext({
            // ...devices['Desktop Firefox'],
             viewport: { width: 1920, height: 945 },
             screen: { width: 1920, height: 1080 },
             storageState: sessionContent as any,
-            ...i18nPreset && {
-                ...i18nPreset,
-                proxy: i18nPreset.proxies.filter(p => p.healthy)[0]
-            }
+            proxy,
+            timezoneId: timezone || this.config.defaults?.timezone,
+            locale: locale || this.config.defaults?.locale,
+            geolocation
         })
 
         context.setDefaultNavigationTimeout(20000)
@@ -513,10 +496,15 @@ class WebSurf {
         return this.currentBrowser
     }
 
-    protected async getBrowser(browserName?: BrowserName): Promise<Browser> {
-        browserName = browserName || this.config.defaultBrowser
+    protected async getBrowser(optBrowserName?: BrowserName): Promise<Browser> {
+        const browserName: BrowserName = optBrowserName || this.config.defaults?.browser || Object.keys(this.config.browserLaunchers)[0] as BrowserName
 
         if (!this.browsers[browserName]) {
+
+            if (!this.config.browserLaunchers[browserName]) {
+                throw new Error(browserName + ' not available')
+            }
+
             const browserOpts = {
               headless: false,
               args: [
