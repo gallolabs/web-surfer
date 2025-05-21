@@ -231,6 +231,7 @@ When output contains string (text/plain or application/json), binary data will b
 
 - Direct http call without browser
 - Ability to call with GET with CORS allow -> need URL token (jwt ?) to exec it
+- Cache ?
 - Resolve import on $call call instead of init, with ability to refer to the same "document"
 - Add URI sha1 check to ensure a resource has not changed ? Or another way to manage contracts/trust ?
 - Add contracts zod for inputs/output, etc
