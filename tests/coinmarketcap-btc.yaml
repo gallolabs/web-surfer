@@ -76,7 +76,7 @@ expression: |
         & ']]></title>
         <link>' & $item.meta.sourceUrl &'</link>
         <enclosure url="' & $item.cover &'" type="image/jpeg" />
-        <pubDate>' & $item.meta.releasedAt & '</pubDate>
+        <pubDate>' & $date($item.meta.releasedAt).format('ddd, MM MMM YYYY hh:mm:ss') & '</pubDate>
           </item>
       '
     }), '\n') & ' </channel>
