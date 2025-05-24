@@ -123,6 +123,8 @@ ${docApi}       `,
 
     fastify.get('/@:username/surfs/crypto-actus/run', async(request, reply) => {
 
+        reply.header('Access-Control-Allow-Origin', '*')
+
         const fileContent = readFileSync('tests/coinmarketcap-btc.yaml', {encoding: 'utf8'})
 
         const content = yaml.parse(fileContent)
