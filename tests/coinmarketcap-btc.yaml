@@ -66,7 +66,14 @@ expression: |
     <generator>https://wordpress.org/?v=6.6.2</generator>
   ' & $join($map($items, function($item) {
       '<item>
-        <title><![CDATA[' & $item.meta.title & ']]></title>
+        <title><![CDATA['
+        & $useCache('coinmarketcap-' & $item.meta.title, 'P1W', function() {
+            $callHttp(
+              $buildUrl('https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=fr&dt=t&q={q}', {'q': $item.meta.title}),
+              {}
+            )[0][0][0]
+          })
+        & ']]></title>
         <link>' & $item.meta.sourceUrl &'</link>
         <enclosure url="' & $item.cover &'" type="image/jpeg" />
         <pubDate>' & $item.meta.releasedAt & '</pubDate>

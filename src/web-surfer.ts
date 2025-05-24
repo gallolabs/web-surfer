@@ -433,15 +433,14 @@ class WebSurf {
         description: 'Call a http endpoint',
         arguments: [[
             Type.String({title: 'url', description: 'The url to call'}),
-            Type.Any({additionalProperties: true, title: 'opts', description: 'The options'}),
+            Type.Optional(Type.Any({additionalProperties: true, title: 'opts', description: 'The options'})),
         ]],
         returns: Type.String({description: 'The text'})
     })
-    public async $callHttp(url: string, opts: any): Promise<any> {
+    public async $callHttp(url: string, opts: {method?: any, body?: any} = {}): Promise<any> {
         if (this.currentPage) {
             // Use browser instead ?
         }
-
         const res = await got(url, {
             headers: {
                 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'
@@ -541,6 +540,26 @@ class WebSurf {
             template = template.replace('{'+key+'}', encodeURIComponent(variables[key]))
         })
         return template
+    }
+
+    @api({
+        description: 'Use cache for something',
+        arguments: [[
+            Type.String({title: 'cacheKey'}),
+            Type.String({title: 'ttl'}),
+            Type.Any({title: 'fn'})
+        ]],
+        returns: undefined
+    })
+    public async $useCache(cacheKey: string, ttl: string, fn: any): Promise<any> {
+        let content = await this.config.sessionsHandler.readSession(this.getSessionFullId(cacheKey))
+
+        if (!content) {
+            content = await fn()
+            await this.config.sessionsHandler.writeSession(this.getSessionFullId(cacheKey), ttl, content!)
+        }
+
+        return content
     }
 
     @api({
