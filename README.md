@@ -229,6 +229,7 @@ When output contains string (text/plain or application/json), binary data will b
 
 ## Todo
 
+- Native Yaml support
 - Global Registry and/or user registry
 - Direct http call without browser
 - Ability to call with GET with CORS allow -> need URL token (jwt ?) to exec it

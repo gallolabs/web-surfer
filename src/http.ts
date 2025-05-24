@@ -2,13 +2,15 @@ import swagger from '@fastify/swagger'
 import swaggerUi from '@fastify/swagger-ui'
 import { readFileSync } from 'fs'
 import {omit} from 'lodash-es'
-import Fastify from 'fastify'
+import Fastify, { FastifyReply } from 'fastify'
 import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox'
-import {WebSurfer, webSurfDefinitionSchema, WebSurfRuntimeError, InvalidWebSurfDefinitionError, surfQLApiDoc} from './web-surfer.js'
+import {WebSurfer, webSurfDefinitionSchema, WebSurfRuntimeError, InvalidWebSurfDefinitionError, surfQLApiDoc, WebSurfDefinitionSchema} from './web-surfer.js'
 import traverse from 'traverse'
 import { fileTypeFromBuffer } from 'file-type'
 import { OptionalKind } from '@sinclair/typebox'
 import basicAuth from '@fastify/basic-auth'
+
+import * as yaml from 'yaml'
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -119,6 +121,64 @@ ${docApi}       `,
         req.username = username
     }, authenticate: true})
 
+    fastify.get('/@:username/surfs/crypto-actus/run', async(request, reply) => {
+
+        const fileContent = readFileSync('tests/coinmarketcap-btc.yaml', {encoding: 'utf8'})
+
+        const content = yaml.parse(fileContent)
+
+        const surf: WebSurfDefinitionSchema = {
+            input: request.query,
+            imports: {
+                userSurf: content
+            },
+            expression: '$call("userSurf", $)'
+        }
+
+        return httpSurfRun(surf, (request.params as any).username, reply)
+    })
+
+    fastify.post('/@:username/surfs/crypto-actus/run', async() => {})
+
+    fastify.get('/@:username/surfs/:surfName', async() => {})
+    fastify.put('/@:username/surfs/:surfName', async() => {})
+    fastify.delete('/@:username/surfs/:surfName', async() => {})
+
+    async function httpSurfRun(body: any, username: string, reply: FastifyReply<any>) {
+        try {
+            const {data, mimeType} = await webSurfer.surf(body, {
+                username: username
+            })
+
+            if (data instanceof Buffer) {
+                reply.type((await fileTypeFromBuffer(data))?.mime || 'application/octet-stream')
+                return data
+            }
+
+            if (mimeType) {
+                reply.type(mimeType)
+            }
+
+            return data instanceof Object ? deepConvertForOutput(data) : data
+        } catch (e) {
+            if (e instanceof InvalidWebSurfDefinitionError) {
+                reply.code(400)
+
+                return e
+            }
+            if (!(e instanceof WebSurfRuntimeError)) {
+                throw e
+            }
+
+            reply.code(500)
+
+            return {
+                message: e.message,
+                details: deepConvertForOutput(e.details)
+            }
+        }
+    }
+
     fastify.post(
         '/surf',
         {
@@ -129,34 +189,7 @@ ${docApi}       `,
             }
         },
         async (request, reply) => {
-            try {
-                const result = await webSurfer.surf(request.body, {
-                    username: request.username!
-                })
-
-                if (result instanceof Buffer) {
-                    reply.type((await fileTypeFromBuffer(result))?.mime || 'application/octet-stream')
-                    return result
-                }
-
-                return result instanceof Object ? deepConvertForOutput(result) : result
-            } catch (e) {
-                if (e instanceof InvalidWebSurfDefinitionError) {
-                    reply.code(400)
-
-                    return e
-                }
-                if (!(e instanceof WebSurfRuntimeError)) {
-                    throw e
-                }
-
-                reply.code(500)
-
-                return {
-                    message: e.message,
-                    details: deepConvertForOutput(e.details)
-                }
-            }
+            return httpSurfRun(request.body, request.username!, reply)
         }
     )
 

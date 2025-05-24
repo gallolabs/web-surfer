@@ -6,7 +6,7 @@ services:
     environment:
       - TIMEOUT=60000
       - CONCURRENT=10
-      - HOST=0.0.0.0
+      #- HOST=0.0.0.0
       - TOKEN=6R0W53R135510
       - TZ=Europe/Paris
       - LANG=fr_FR

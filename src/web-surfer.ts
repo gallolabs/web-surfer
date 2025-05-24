@@ -23,6 +23,7 @@ export const webSurferConfigSchema = Type.Object({
 
 export const webSurfDefinitionSchema = Type.Object({
     input: Type.Optional(Type.Any()),
+    outputMimeType: Type.Optional(Type.String()),
     imports: Type.Optional(Type.Record(Type.String(), /* webSurfDefinitionSchema */ Type.Any())),
     expression: Type.String(),
     schemas: Type.Optional(Type.Object({
@@ -35,7 +36,10 @@ export type WebSurfDefinitionSchema = Static<typeof webSurfDefinitionSchema>
 
 export type WebSurferConfig = Static<typeof webSurferConfigSchema> & {sessionsHandler: SessionsHandler}
 
-export type WebSurfResult = any
+export type WebSurfResult = {
+    mimeType?: string
+    data: any
+}
 
 export class WebSurfRuntimeError extends Error {
     name = 'WebSurfError'
@@ -197,7 +201,7 @@ class WebSurf {
         input = modul.input instanceof Object && input instanceof Object ? {...modul.input, ...input} : input
 
         if (modul.schemas?.input) {
-            const validate = (new Ajv).compile(modul.schemas.input)
+            const validate = (new Ajv({coerceTypes: true})).compile(modul.schemas.input)
 
             if (!validate(input)) {
                 throw new WebSurfRuntimeError('Invalid input', {details: validate.errors})
@@ -426,6 +430,62 @@ class WebSurf {
     }
 
     @api({
+        description: 'Call a http endpoint',
+        arguments: [[
+            Type.String({title: 'url', description: 'The url to call'}),
+            Type.Any({additionalProperties: true, title: 'opts', description: 'The options'}),
+        ]],
+        returns: Type.String({description: 'The text'})
+    })
+    public async $callHttp(url: string, opts: any): Promise<any> {
+        if (this.currentPage) {
+            // Use browser instead ?
+        }
+
+        const res = await got(url, {
+            headers: {
+                'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'
+            },
+            method: opts.method || 'GET',
+            json: opts.body
+        })
+
+        const isJson = res.headers['content-type']?.includes('application/json')
+
+        return isJson ? JSON.parse(res.body) : res.body
+    }
+
+    @api({
+        description: 'Extract items list',
+        arguments: [[
+            Type.String({title: 'elementsLocator', description: 'The elements locator'}),
+            Type.Any({additionalProperties: true, title: 'propertiesLocators', description: 'The element properties locator'}),
+        ]],
+        returns: Type.String({description: 'The text'})
+    })
+    public async $extract(elementsLocator: string, propertiesLocators: Record<string, string | string[]>): Promise<Record<string, string>[]> {
+        const page = await this.getCurrentPage()
+        const els = []
+
+        for (const element of await page.locator(elementsLocator).all()) {
+            const obj: Record<string, string> = {}
+
+            for(const propLocKey in propertiesLocators) {
+                if (Array.isArray(propertiesLocators[propLocKey])) {
+                    console.log(propertiesLocators[propLocKey])
+                    obj[propLocKey] = await element.locator(propertiesLocators[propLocKey][0]).getAttribute(propertiesLocators[propLocKey][1]) as string
+                } else {
+                    obj[propLocKey] = await element.locator(propertiesLocators[propLocKey]).textContent() as string
+                }
+            }
+
+            els.push(obj)
+        }
+
+        return els
+    }
+
+    @api({
         description: 'Read a text',
         arguments: [[
             Type.String({title: 'locator', description: 'The field locator'}),
@@ -577,7 +637,7 @@ export class WebSurfer {
         try {
 
             if (surfDefinition.schemas?.input) {
-                const validate = (new Ajv).compile(surfDefinition.schemas.input)
+                const validate = (new Ajv({coerceTypes: true})).compile(surfDefinition.schemas.input)
 
                 if (!validate(input)) {
                     throw new WebSurfRuntimeError('Invalid input', {details: validate.errors})
@@ -613,7 +673,10 @@ export class WebSurfer {
 
             }
 
-            return v
+            return {
+                mimeType: surfDefinition.outputMimeType,
+                data: v
+            }
         } catch (e) {
                             console.log(e)
             if (e instanceof Object && !(e instanceof Error) && (e as any).code && (e as any).token) {

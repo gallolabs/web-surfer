@@ -1,0 +1,76 @@
+input:
+  coin: 'ALL'
+  size: 10
+
+schemas:
+  input:
+    type: object
+    properties:
+      coin:
+        type: string
+      size:
+        type: number
+
+outputMimeType: 'application/rss+xml'
+
+expression: |
+  $coinsMapping := {
+    'BTC': 1
+  };
+
+  /*
+  $startSurfing({'session': {'id': 'coinmarketcap', 'ttl': 'P1M'}});
+  $goTo('https://coinmarketcap.com/headlines/news/');
+
+  $byBrowser := $extract('.infinite-scroll-component .uikit-row', {
+    'title': '.uikit-col-sm-10 a',
+    'link': ['.uikit-col-sm-10 a', 'href'] $extract.text('.uikit-col-sm-10 a')
+  });
+
+  $byHttp := $callHttp('https://api.coinmarketcap.com/aggr/v4/content/user', {
+    'method': 'POST',
+    'body': {"mode":"LATEST","page":1,"size":20,"language":"en","coins":[1027],"newsTypes":["NEWS","ALEXANDRIA"]}
+  }).data;
+
+  {
+    "byBrowser": $byBrowser,
+    "byHttp": $byHttp
+  };
+
+  */
+
+  $items := $callHttp('https://api.coinmarketcap.com/aggr/v4/content/user', {
+    'method': 'POST',
+    'body': {"mode":"LATEST","page":1,"size":size,"language":"en","coins": coin = 'ALL' ? undefined : [$lookup($coinsMapping, coin)],"newsTypes":["NEWS","ALEXANDRIA"]}
+  }).data;
+
+  '<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+    xmlns:content="http://purl.org/rss/1.0/modules/content/"
+    xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+    xmlns:dc="http://purl.org/dc/elements/1.1/"
+    xmlns:atom="http://www.w3.org/2005/Atom"
+    xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+    xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+    >
+  ' & '<channel>
+    <title>Cryptoast</title>
+    <atom:link href="https://cryptoast.fr/feed/" rel="self" type="application/rss+xml" />
+    <link>https://cryptoast.fr/</link>
+    <description>Démocratisons la crypto-monnaie !</description>
+    <lastBuildDate>Fri, 23 May 2025 10:47:18 +0000</lastBuildDate>
+    <language>fr-FR</language>
+    <sy:updatePeriod>
+    hourly  </sy:updatePeriod>
+    <sy:updateFrequency>
+    1 </sy:updateFrequency>
+    <generator>https://wordpress.org/?v=6.6.2</generator>
+  ' & $join($map($items, function($item) {
+      '<item>
+        <title><![CDATA[' & $item.meta.title & ']]></title>
+        <link>' & $item.meta.sourceUrl &'</link>
+        <enclosure url="' & $item.cover &'" type="image/jpeg" />
+        <pubDate>' & $item.meta.releasedAt & '</pubDate>
+          </item>
+      '
+    }), '\n') & ' </channel>
+  </rss>'

@@ -1,4 +1,4 @@
-FROM ghcr.io/browserless/multi
+FROM ghcr.io/browserless/multi:v2.22.0
 
 ENV TZ=Europe/Paris
 ENV LANG=fr_FR.UTF-8
