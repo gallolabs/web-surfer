@@ -2,6 +2,10 @@ FROM node:lts
 
 WORKDIR /app
 
+ADD package.json package-lock.json ./
+
+RUN npm i
+
 ADD ./ ./
 
 RUN npm run build

@@ -7,7 +7,7 @@
   "license": "ISC",
   "description": "Automated surf, scrape Enedis, Doctolib, etc",
   "scripts": {
-    "build": "rm -Rf dist && npx tsc",
+    "build": "rm -Rf dist && tsc",
     "start": "docker compose up --build",
     "serve-lib": "node dist/serve-lib.js"
   },
