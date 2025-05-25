@@ -1,0 +1,11 @@
+input: ~
+
+expression: |
+
+  $to := $date().startOf('minute').toDate().getTime() / 1000;
+  $from := $date().subtract(30, 'days').startOf('minute').toDate().getTime() / 1000;
+
+  $callHttp($buildUrl(
+    'https://api.coinmarketcap.com/data-api/v3/fear-greed/chart?start={from}&end={to}&convertId=2790',
+    {'from': $from, 'to': $to}
+  )).data.dataList;
