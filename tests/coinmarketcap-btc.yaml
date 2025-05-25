@@ -39,9 +39,11 @@ expression: |
 
   */
 
+
+
   $items1 := $callHttp('https://api.coinmarketcap.com/aggr/v4/content/user', {
     'method': 'POST',
-    'body': {"mode":"LATEST","page":1,"size":size,"language":"en","coins": coin = 'ALL' ? undefined : [$lookup($coinsMapping, coin)],"newsTypes":["NEWS","ALEXANDRIA"]}
+    'body': {"mode":"LATEST","page":1,"size":$ceil(size / 2),"language":"en","coins": coin = 'ALL' ? undefined : [$lookup($coinsMapping, coin)],"newsTypes":["NEWS","ALEXANDRIA"]}
   }).data.{'title': meta.title, 'link': meta.sourceUrl, 'date': $date(meta.releasedAt).toDate().getTime(), 'lang': 'en'};
 
   $items2 := $callHttp('https://news-mediator.tradingview.com/news-flow/v2/news?filter=lang%3Afr&filter=market%3Acrypto&client=screener&streaming=true')
@@ -71,22 +73,25 @@ expression: |
     <sy:updateFrequency>
     1 </sy:updateFrequency>
     <generator>https://wordpress.org/?v=6.6.2</generator>
-  ' & $join($map($items, function($item) {
-      '<item>
-        <title><![CDATA['
-        & ($item.lang = 'en' ?
-
-        $useCache('coinmarketcap-' & $item.title, 'P1W', function() {
-            $callHttp(
-              $buildUrl('https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=fr&dt=t&q={q}', {'q': $item.title}),
-              {}
-            )[0][0][0]
-          })
-          : $item.title)
-        & ']]></title>
-        <link>' & $item.link &'</link>
-        <pubDate>' & $date($item.date).format('ddd, MM MMM YYYY hh:mm:ss') & '</pubDate>
+  ' & $join(
+      $map($items, function($item) {
+        '<item>
+            <title><![CDATA['
+            & ($item.lang = 'en' ?
+            ('[EN] ' &
+             $useCache('coinmarketcap-' & $item.title, 'P1W', function() {
+                $callHttp(
+                  $buildUrl('https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=fr&dt=t&q={q}', {'q': $item.title}),
+                  {}
+                )[0][0][0]
+              })
+              ): ('[FR] ' & $item.title))
+            & ']]></title>
+            <link>' & $item.link &'</link>
+            <pubDate>' & $date($item.date).format('ddd, DD MMM YYYY hh:mm:ss') & '</pubDate>
           </item>
-      '
-    }), '\n') & ' </channel>
-  </rss>' /* <enclosure url="' & $item.cover &'" type="image/jpeg" /> */
+        '
+      }),
+    '\n'
+    ) & ' </channel>
+  </rss>'
