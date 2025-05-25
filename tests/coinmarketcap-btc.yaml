@@ -87,7 +87,7 @@ expression: |
               })
               ): ('[FR] ' & $item.title))
             & ']]></title>
-            <link>' & $item.link &'</link>
+            <link><![CDATA[' & $item.link &']]</link>
             <pubDate>' & $date($item.date).format('ddd, DD MMM YYYY hh:mm:ss') & '</pubDate>
           </item>
         '
