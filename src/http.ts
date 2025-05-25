@@ -137,7 +137,24 @@ ${docApi}       `,
             expression: '$call("userSurf", $)'
         }
 
+        return httpSurfRun(surf, (request.params as any).username, reply)
+    })
 
+    fastify.get('/@:username/surfs/crypto-cupidity/run', async(request, reply) => {
+
+        reply.header('Access-Control-Allow-Origin', '*')
+
+        const fileContent = readFileSync('tests/coinmarketcap-cupidity.yaml', {encoding: 'utf8'})
+
+        const content = yaml.parse(fileContent)
+
+        const surf: WebSurfDefinitionSchema = {
+            input: request.query,
+            imports: {
+                userSurf: content
+            },
+            expression: '$call("userSurf", $)'
+        }
 
         return httpSurfRun(surf, (request.params as any).username, reply)
     })
