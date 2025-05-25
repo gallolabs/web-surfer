@@ -19,30 +19,37 @@ expression: |
   };
 
   /*
-  $startSurfing({'session': {'id': 'coinmarketcap', 'ttl': 'P1M'}});
-  $goTo('https://coinmarketcap.com/headlines/news/');
+    $startSurfing({'session': {'id': 'coinmarketcap', 'ttl': 'P1M'}});
+    $goTo('https://coinmarketcap.com/headlines/news/');
 
-  $byBrowser := $extract('.infinite-scroll-component .uikit-row', {
-    'title': '.uikit-col-sm-10 a',
-    'link': ['.uikit-col-sm-10 a', 'href'] $extract.text('.uikit-col-sm-10 a')
-  });
+    $byBrowser := $extract('.infinite-scroll-component .uikit-row', {
+      'title': '.uikit-col-sm-10 a',
+      'link': ['.uikit-col-sm-10 a', 'href'] $extract.text('.uikit-col-sm-10 a')
+    });
 
-  $byHttp := $callHttp('https://api.coinmarketcap.com/aggr/v4/content/user', {
-    'method': 'POST',
-    'body': {"mode":"LATEST","page":1,"size":20,"language":"en","coins":[1027],"newsTypes":["NEWS","ALEXANDRIA"]}
-  }).data;
+    $byHttp := $callHttp('https://api.coinmarketcap.com/aggr/v4/content/user', {
+      'method': 'POST',
+      'body': {"mode":"LATEST","page":1,"size":20,"language":"en","coins":[1027],"newsTypes":["NEWS","ALEXANDRIA"]}
+    }).data;
 
-  {
-    "byBrowser": $byBrowser,
-    "byHttp": $byHttp
-  };
+    {
+      "byBrowser": $byBrowser,
+      "byHttp": $byHttp
+    };
 
   */
 
-  $items := $callHttp('https://api.coinmarketcap.com/aggr/v4/content/user', {
+  $items1 := $callHttp('https://api.coinmarketcap.com/aggr/v4/content/user', {
     'method': 'POST',
     'body': {"mode":"LATEST","page":1,"size":size,"language":"en","coins": coin = 'ALL' ? undefined : [$lookup($coinsMapping, coin)],"newsTypes":["NEWS","ALEXANDRIA"]}
-  }).data;
+  }).data.{'title': meta.title, 'link': meta.sourceUrl, 'date': $date(meta.releasedAt).toDate().getTime(), 'lang': 'en'};
+
+  $items2 := $callHttp('https://news-mediator.tradingview.com/news-flow/v2/news?filter=lang%3Afr&filter=market%3Acrypto&client=screener&streaming=true')
+  .items.{'title': title, 'link': link, 'date': $date(published * 1000).toDate().getTime(), 'lang': 'fr'};
+
+  $size := size - 1;
+
+  $items := ($append($items1, $items2)^(>date))[[0..$size]];
 
   '<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
     xmlns:content="http://purl.org/rss/1.0/modules/content/"
@@ -67,15 +74,18 @@ expression: |
   ' & $join($map($items, function($item) {
       '<item>
         <title><![CDATA['
-        & $useCache('coinmarketcap-' & $item.meta.title, 'P1W', function() {
+        & ($item.lang = 'en' ?
+
+        $useCache('coinmarketcap-' & $item.title, 'P1W', function() {
             $callHttp(
-              $buildUrl('https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=fr&dt=t&q={q}', {'q': $item.meta.title}),
+              $buildUrl('https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=fr&dt=t&q={q}', {'q': $item.title}),
               {}
             )[0][0][0]
           })
+          : $item.title)
         & ']]></title>
-        <link>' & $item.meta.sourceUrl &'</link>
-        <pubDate>' & $date($item.meta.releasedAt).format('ddd, MM MMM YYYY hh:mm:ss') & '</pubDate>
+        <link>' & $item.link &'</link>
+        <pubDate>' & $date($item.date).format('ddd, MM MMM YYYY hh:mm:ss') & '</pubDate>
           </item>
       '
     }), '\n') & ' </channel>

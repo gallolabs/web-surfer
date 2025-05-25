@@ -348,11 +348,13 @@ class WebSurf {
     @api({
         description: 'Create a new dayjs date',
         arguments: [[
-            Type.Optional(Type.String({title: 'date', description: 'The date'}))
+            Type.Optional(
+                Type.Union([Type.String(), Type.Number()],{title: 'date', description: 'The date'})
+            )
         ]],
         returns: {type: 'Dayjs', description: 'A Dayjs date object'}
     })
-    public $date(date?: string): Dayjs {
+    public $date(date?: string | number): Dayjs {
         return dayjs(date)
     }
 
