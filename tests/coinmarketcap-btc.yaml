@@ -39,59 +39,60 @@ expression: |
 
   */
 
+  $useCache('coinmarketcap-btc', 'PT1M', function() {(
+      $items1 := $callHttp('https://api.coinmarketcap.com/aggr/v4/content/user', {
+      'method': 'POST',
+      'body': {"mode":"LATEST","page":1,"size":$ceil(size / 2),"language":"en","coins": coin = 'ALL' ? undefined : [$lookup($coinsMapping, coin)],"newsTypes":["NEWS","ALEXANDRIA"]}
+    }).data.{'title': meta.title, 'link': meta.sourceUrl, 'date': $date(meta.releasedAt).toDate().getTime(), 'lang': 'en'};
 
+    $items2 := $callHttp('https://news-mediator.tradingview.com/news-flow/v2/news?filter=lang%3Afr&filter=market%3Acrypto&client=screener&streaming=true')
+    .items.{'title': title, 'link': link, 'date': $date(published * 1000).toDate().getTime(), 'lang': 'fr'};
 
-  $items1 := $callHttp('https://api.coinmarketcap.com/aggr/v4/content/user', {
-    'method': 'POST',
-    'body': {"mode":"LATEST","page":1,"size":$ceil(size / 2),"language":"en","coins": coin = 'ALL' ? undefined : [$lookup($coinsMapping, coin)],"newsTypes":["NEWS","ALEXANDRIA"]}
-  }).data.{'title': meta.title, 'link': meta.sourceUrl, 'date': $date(meta.releasedAt).toDate().getTime(), 'lang': 'en'};
+    $size := size - 1;
 
-  $items2 := $callHttp('https://news-mediator.tradingview.com/news-flow/v2/news?filter=lang%3Afr&filter=market%3Acrypto&client=screener&streaming=true')
-  .items.{'title': title, 'link': link, 'date': $date(published * 1000).toDate().getTime(), 'lang': 'fr'};
+    $items := ($append($items1, $items2)^(>date))[[0..$size]];
 
-  $size := size - 1;
+    '<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+      xmlns:content="http://purl.org/rss/1.0/modules/content/"
+      xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+      xmlns:dc="http://purl.org/dc/elements/1.1/"
+      xmlns:atom="http://www.w3.org/2005/Atom"
+      xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+      xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
+      >
+    ' & '<channel>
+      <title>Cryptoast</title>
+      <atom:link href="https://cryptoast.fr/feed/" rel="self" type="application/rss+xml" />
+      <link>https://cryptoast.fr/</link>
+      <description>Démocratisons la crypto-monnaie !</description>
+      <lastBuildDate>Fri, 23 May 2025 10:47:18 +0000</lastBuildDate>
+      <language>fr-FR</language>
+      <sy:updatePeriod>
+      hourly  </sy:updatePeriod>
+      <sy:updateFrequency>
+      1 </sy:updateFrequency>
+      <generator>https://wordpress.org/?v=6.6.2</generator>
+    ' & $join(
+        $map($items, function($item) {
+          '<item>
+              <title><![CDATA['
+              & ($item.lang = 'en' ?
+              ('[EN] ' &
+               $useCache('coinmarketcap-trad-' & $item.title, 'P1W', function() {
+                  $callHttp(
+                    $buildUrl('https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=fr&dt=t&q={q}', {'q': $item.title}),
+                    {}
+                  )[0][0][0]
+                })
+                ): ('[FR] ' & $item.title))
+              & ']]></title>
+              <link><![CDATA[' & $item.link &']]></link>
+              <pubDate>' & $date($item.date).format('ddd, DD MMM YYYY hh:mm:ss') & '</pubDate>
+            </item>
+          '
+        }),
+      '\n'
+      ) & ' </channel>
+    </rss>'
 
-  $items := ($append($items1, $items2)^(>date))[[0..$size]];
-
-  '<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
-    xmlns:content="http://purl.org/rss/1.0/modules/content/"
-    xmlns:wfw="http://wellformedweb.org/CommentAPI/"
-    xmlns:dc="http://purl.org/dc/elements/1.1/"
-    xmlns:atom="http://www.w3.org/2005/Atom"
-    xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
-    xmlns:slash="http://purl.org/rss/1.0/modules/slash/"
-    >
-  ' & '<channel>
-    <title>Cryptoast</title>
-    <atom:link href="https://cryptoast.fr/feed/" rel="self" type="application/rss+xml" />
-    <link>https://cryptoast.fr/</link>
-    <description>Démocratisons la crypto-monnaie !</description>
-    <lastBuildDate>Fri, 23 May 2025 10:47:18 +0000</lastBuildDate>
-    <language>fr-FR</language>
-    <sy:updatePeriod>
-    hourly  </sy:updatePeriod>
-    <sy:updateFrequency>
-    1 </sy:updateFrequency>
-    <generator>https://wordpress.org/?v=6.6.2</generator>
-  ' & $join(
-      $map($items, function($item) {
-        '<item>
-            <title><![CDATA['
-            & ($item.lang = 'en' ?
-            ('[EN] ' &
-             $useCache('coinmarketcap-' & $item.title, 'P1W', function() {
-                $callHttp(
-                  $buildUrl('https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=fr&dt=t&q={q}', {'q': $item.title}),
-                  {}
-                )[0][0][0]
-              })
-              ): ('[FR] ' & $item.title))
-            & ']]></title>
-            <link><![CDATA[' & $item.link &']]></link>
-            <pubDate>' & $date($item.date).format('ddd, DD MMM YYYY hh:mm:ss') & '</pubDate>
-          </item>
-        '
-      }),
-    '\n'
-    ) & ' </channel>
-  </rss>'
+  )})
