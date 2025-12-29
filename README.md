@@ -229,6 +229,7 @@ When output contains string (text/plain or application/json), binary data will b
 
 ## Todo
 
+- Use https://github.com/Kaliiiiiiiiii-Vinyzu/patchright ?
 - Native Yaml support
 - Global Registry and/or user registry
 - Direct http call without browser
