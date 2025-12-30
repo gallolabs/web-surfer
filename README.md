@@ -229,6 +229,7 @@ When output contains string (text/plain or application/json), binary data will b
 
 ## Todo
 
+- Add LLM (IA) input that will use model + MCP (and cached plan ?)
 - Add debug video support ?
 - Ability to get/set sessions vars (stateless service ?)
 - Ability to put defaults values in the json (browser name, etc) to be able to have separated context and steps
