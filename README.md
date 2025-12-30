@@ -229,6 +229,9 @@ When output contains string (text/plain or application/json), binary data will b
 
 ## Todo
 
+- Add debug video support ?
+- Ability to get/set sessions vars (stateless service ?)
+- Ability to put defaults values in the json (browser name, etc) to be able to have separated context and steps
 - Use https://github.com/Kaliiiiiiiiii-Vinyzu/patchright ?
 - Native Yaml support
 - Global Registry and/or user registry
