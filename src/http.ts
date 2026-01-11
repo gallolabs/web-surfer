@@ -22,6 +22,10 @@ export default async function server(webSurfer: WebSurfer) {
 
     const fastify = Fastify({logger: true}).withTypeProvider<TypeBoxTypeProvider>()
 
+    fastify.addContentTypeParser('application/yaml', {parseAs: 'string'}, async (_: any, body: string) => {
+        return yaml.parse(body)
+    })
+
     const docApi = Object.keys(surfQLApiDoc).map((fnName: string) => {
         const doc = surfQLApiDoc[fnName]
         let content = '### ' + fnName + '\n'
