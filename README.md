@@ -5,7 +5,7 @@
 
 ## Description
 
-Web-Surfer is a webservice to automate (ex scrape) web surfs.
+Web-Surfer is a webservice to automate (ex scrape) web surfs, especially to query data on the web. 
 
 ### Launch
 
