@@ -5,7 +5,9 @@
 
 ## Description
 
-Web-Surfer is a webservice to automate (ex scrape) web surfs, especially to query data on the web. 
+Web-Surfer is a webservice to automate web surfs, especially to query data on the web. 
+
+It abstracts the how (playwright, a browser, both with compatible versions, instanciations, configurations, etc) and let you be concentrated on what you want : query the web. Just make an http request to it with your need and it returns the result like you want. Usable in n8n or anywhere you want.
 
 ### Launch
 
