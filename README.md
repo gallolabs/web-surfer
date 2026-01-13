@@ -1,5 +1,5 @@
 <p align="center">
-    <img height="300" src="https://raw.githubusercontent.com/gallolabs/web-surfer/main/logo_w300.jpeg">
+    <img height="200" src="https://raw.githubusercontent.com/gallolabs/web-surfer/main/logo_w300.jpeg">
   <h1 align="center">Web Surfer</h1>
 </p>
 
@@ -9,14 +9,22 @@ Web-Surfer is a webservice to automate web surfs, especially to query data on th
 
 It abstracts the how (playwright, a browser, both with compatible versions, instanciations, configurations, etc) and let you be concentrated on what you want : query the web. Just make an http request to it with your need and it returns the result like you want. Usable in n8n or anywhere you want.
 
-### Launch
+### Example 1
+
+![Demo 1](./demo1.png)
+
+### Example 2
+
+![Demo 2](./demo2.png)
+
+## Launch
 
 ```sh
 npm i
 sudo docker compose up
 ```
 
-### Test
+## Test
 
 You can use the command :
 
