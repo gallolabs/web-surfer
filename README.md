@@ -3,39 +3,67 @@
   <h1 align="center">Web Surfer</h1>
 </p>
 
-## Description
+## 🌐 Web Surfer
 
-Web-Surfer is a webservice to automate web surfs, especially to query data on the web. 
+Web Surfer is an API-based web browser automation and scraping service.
+It allows you to automate complex web navigation flows (clicks, forms, scrolling, data extraction) by controlling real browsers such as Firefox, Chrome, and WebKit.
 
 It abstracts the how (playwright, a browser, both with compatible versions, instanciations, configurations, etc) and let you be concentrated on what you want : query the web. Just make an http request to it with your need and it returns the result like you want. Usable in n8n or anywhere you want.
 
-### Example 1
+Unlike simple HTTP scrapers, Web Surfer is designed for interactive and dynamic websites.
 
 ![Demo 1](./demo1.png)
 
-### Example 2
+## 🔍 What is Web Surfer?
+
+Web Surfer lets you simulate real user behavior in a browser and extract structured data through a simple web API.
+
+It is built to:
+- automate complex navigation paths
+- scrape data from JavaScript-heavy websites
+- avoid writing low-level Selenium or Puppeteer code
+- run as a standalone microservice
+
+Typical use cases include:
+
+- advanced web scraping
+- data extraction from interactive websites
+- automation workflows
+- monitoring dynamic web pages
+
+## 🚀 Features
+
+- ✅ REST API to control real web browsers
+- ✅ Supports Firefox, Chrome, and WebKit
+- ✅ Human-like navigation actions (click, scroll, form input)
+- ✅ Text extraction and screenshots
+- ✅ Declarative navigation scripts (YAML / JSON)
+ -✅ Can be deployed as a service using Docker
 
 ![Demo 2](./demo2.png)
 
-## Launch
+## 🧱 Installation
 
+Start the service using Docker Compose:
 ```sh
-npm i
+npm install
 sudo docker compose up
 ```
 
-## Test
+The API will be exposed locally once the service is running.
 
-You can use the command :
+## 🧪 Example Usage
+
+Example: scraping availability from an appointment website
 
 ```sh
 # Pre-requise : Running service (ex npm start)
 npm run build # Build surf-cmd
 npm run serve-lib # Start a server to serve libs (for imports tests)
-node dist/surf-cmd.js --surf-api 'http://localhost:3000' tests/doctolib.yaml --url 'https://www.doctolib.fr/chirurgien-visceral-et-digestif/le-blanc-mesnil/nouredine-oukachbi/booking/availabilities?specialityId=179&telehealth=false&placeId=practice-5105&motiveIds%5B%5D=860154&pid=practice-5105'
+node dist/surf-cmd.js --surf-api 'http://localhost:3000' tests/doctolib.yaml --url 'https://www.doctolib.fr/chirurgien-visceral-et-digestif/le-blanc-mesnil/nouredine-xxx/booking/availabilities?specialityId=179&telehealth=false&placeId=practice-5105&motiveIds%5B%5D=860154&pid=practice-5105'
 ```
 
-This will returns the availabilities for your doctor for the next 15 days :
+The service returns structured JSON data extracted from a real browser session:
 ```javascript
 // Launch date 2024-12-22 21:20+01:00
 [
@@ -50,6 +78,34 @@ This will returns the availabilities for your doctor for the next 15 days :
   '2024-12-26 16:40'
 ]
 ```
+
+## 📜 SurfQL – Navigation DSL
+
+Web Surfer introduces SurfQL, a simple declarative language to describe browser actions:
+```surfQL
+$goTo('https://example.com')
+$clickOn('.accept-button')
+$text: $readText('div.article')
+```
+
+The API response will contain extracted values (text, screenshots, metadata).
+
+## 🧠 Use Cases
+
+Web Surfer is well suited for:
+
+- interactive web scraping
+- websites requiring user actions (clicks, forms, cookies)
+- JavaScript-heavy pages
+- automated monitoring and data collection
+- backend workflows requiring browser automation
+
+## 🤝 Contributing
+
+Contributions are welcome!
+- Fork the repository
+- Create a feature branch
+- Open a pull request
 
 ## POST /surf with SurfQL
 
